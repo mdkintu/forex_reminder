@@ -1,0 +1,21 @@
+# Apache/cPanel .htaccess for Passenger Django app
+#
+# Serves Django static files and lets Passenger handle the rest.
+# Place this at the Application root (where passenger_wsgi.py is).
+#
+# NOTE: If Passenger is handling everything and serving /static/ already,
+# this file may be minimal or unnecessary. It is included to route /static/
+# to the collected staticfiles directory via Apache where needed.
+
+# Allow Passenger to handle non-static requests (set by cPanel usually).
+PassengerEnabled on
+
+# Serve collected static files (run: manage.py collectstatic first)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # If the request maps to an existing file under /static/, serve it
+    RewriteCond %{REQUEST_URI} ^/static/
+    RewriteCond %{DOCUMENT_ROOT}/staticfiles%{REQUEST_URI} -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/staticfiles%{REQUEST_URI} -d
+    RewriteRule ^(.*)$ /staticfiles/$1 [L]
+</IfModule>

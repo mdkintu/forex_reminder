@@ -25,6 +25,13 @@ ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS", default="localhost,127.0.0.1"
 ).split(",")
 
+# Trusted HTTPS origins for POST forms (CSRF). Empty in development.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in config("CSRF_TRUSTED_ORIGINS", default="").split(",")
+    if origin.strip()
+]
+
 
 # Application definition
 
@@ -157,8 +164,16 @@ ROOT_URLCONF = "forex_reminder.urls"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / config("DB_NAME", default="db.sqlite3"),
+        "ENGINE": config("DB_ENGINE", default="django.db.backends.sqlite3"),
+        "NAME": config(
+            "DB_NAME",
+            default=(BASE_DIR / "db.sqlite3").as_posix(),
+        ),
+        # The rest are only used by non-SQLite engines (MySQL/Postgres).
+        "USER": config("DB_USER", default=""),
+        "PASSWORD": config("DB_PASSWORD", default=""),
+        "HOST": config("DB_HOST", default=""),
+        "PORT": config("DB_PORT", default=""),
     }
 }
 

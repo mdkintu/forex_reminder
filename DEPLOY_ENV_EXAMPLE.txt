@@ -1,0 +1,56 @@
+# ============================================================================
+# Production settings for Namecheap cPanel shared hosting (fair.tergym.com)
+#
+# Copy these values into your cPanel app's .env file, OR set them as
+# Environment Variables in the cPanel "Setup Python App" form.
+#
+# IMPORTANT:
+#   * DEBUG must be False on production.
+#   * ALLOWED_HOSTS must include your domain.
+#   * Generate a strong random SECRET_KEY.
+# ============================================================================
+
+# --- Django core ---
+SECRET_KEY=generate-a-long-strong-random-secret-here
+DEBUG=False
+# Add your cPanel URL too (e.g. yourcpusername.yourhost.tld) so it works while
+# you test before the domain DNS is pointed.
+ALLOWED_HOSTS=fair.tergym.com,127.0.0.1,localhost
+# Trust the HTTPS origin so POST forms (login/signup) work over SSL.
+CSRF_TRUSTED_ORIGINS=https://fair.tergym.com
+
+# --- Database ---
+# Shared hosting provides MySQL via cPanel. Create a DB + user in cPanel's
+# "MySQL Databases" and put the credentials here:
+DB_ENGINE=django.db.backends.mysql
+DB_NAME=yourcpuser_fair
+DB_USER=yourcpuser_fairuser
+DB_PASSWORD=your-db-password
+DB_HOST=localhost
+DB_PORT=3306
+
+# --- Celery / Redis ---
+# NOT used on shared hosting. Reminders run via cron instead (send_reminders).
+REDIS_URL=redis://localhost:6379/0
+
+# --- Email ---
+# Use the SMTP settings provided by cPanel ("Email Deliverability" or the
+# cPanel-provided SMTP host). Example:
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=mail.fair.tergym.com
+EMAIL_PORT=465
+EMAIL_USE_SSL=True
+EMAIL_HOST_USER=no-reply@fair.tergym.com
+EMAIL_HOST_PASSWORD=your-email-password
+DEFAULT_FROM_EMAIL=no-reply@fair.tergym.com
+
+# --- Twilio / WhatsApp (optional) ---
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_FROM=
+
+# --- Telegram ---
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+
+# --- Misc ---
+TIME_ZONE=UTC
