@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Forex Reminder{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Welcome, {{ user.first_name|default:user.email }}</h1>
+        <a href="{% url 'account_change_password' %}" class="btn btn-outline-secondary btn-sm">
+            Change password
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">Your trading accounts</h5>
+                    {% if accounts %}
+                        <ul class="list-group list-group-flush mb-3">
+                            {% for account in accounts %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <a href="{% url 'trades:detail' account.pk %}"
+                                           class="fw-semibold text-decoration-none">
+                                            {{ account.account_name }}
+                                        </a>
+                                        <div class="small text-secondary">
+                                            Last trade: {{ account.last_trade_date|date:"M j, Y" }}
+                                        </div>
+                                    </div>
+                                    <span class="clock-badge"
+                                          data-deadline="{{ account.deadline_iso }}"
+                                          data-label="days left">…</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'trades:list' %}" class="btn btn-outline-primary btn-sm">
+                                View all accounts
+                            </a>
+                            <a href="{% url 'trades:add' %}" class="btn btn-primary btn-sm">
+                                Add trading account
+                            </a>
+                        </div>
+                    {% else %}
+                        <p class="text-secondary">
+                            You haven't added any trading accounts yet. Add one to start
+                            tracking inactivity.
+                        </p>
+                        <a href="{% url 'trades:add' %}" class="btn btn-primary btn-sm">
+                            Add trading account
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">Notification preferences</h5>
+                    <p class="text-secondary">
+                        Phone: {{ user.phone_number|default:"Not set" }}<br>
+                        Telegram chat ID: {{ user.telegram_chat_id|default:"Not set" }}
+                    </p>
+                    <a href="{% url 'accounts:profile' %}" class="btn btn-outline-primary btn-sm">
+                        Edit profile
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

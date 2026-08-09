@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Out — Forex Reminder{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 440px;">
+    <div class="card shadow-sm">
+        <div class="card-body p-4 text-center">
+            <h1 class="h4 card-title mb-3">Sign Out</h1>
+            <p class="text-secondary mb-4">Are you sure you want to sign out?</p>
+
+            <form method="post" action="{% url 'account_logout' %}">
+                {% csrf_token %}
+                {% if redirect_field_value %}
+                    <input type="hidden" name="{{ redirect_field_name }}"
+                           value="{{ redirect_field_value }}">
+                {% endif %}
+                <button type="submit" class="btn btn-danger w-100">Yes, Sign Out</button>
+            </form>
+
+            <a href="{% url 'accounts:home' %}" class="d-block mt-3 small">Cancel and go home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

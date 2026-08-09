@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}{{ account.account_name }} — Forex Reminder{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'trades:list' %}">Accounts</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ account.account_name }}</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <!-- Digital countdown clock -->
+            <div class="card bg-dark text-white shadow">
+                <div class="card-body p-4 text-center">
+                    <h2 class="h5 mb-1 text-uppercase text-secondary">Inactivity countdown</h2>
+                    <div class="mb-3 text-secondary small">
+                        Deadline until <strong>{{ threshold|default:30 }}</strong> days of inactivity reached
+                    </div>
+
+                    <!-- Deadline is injected here as a JS-friendly ISO timestamp -->
+                    <div class="clock d-flex justify-content-center gap-3 my-4"
+                         data-deadline="{{ deadline }}">
+                        <span class="clock-unit">
+                            <b data-role="days">--</b>
+                            <i>Days</i>
+                        </span>
+                        <span class="clock-sep">:</span>
+                        <span class="clock-unit">
+                            <b data-role="hours">--</b>
+                            <i>Hours</i>
+                        </span>
+                        <span class="clock-sep">:</span>
+                        <span class="clock-unit">
+                            <b data-role="minutes">--</b>
+                            <i>Min</i>
+                        </span>
+                        <span class="clock-sep">:</span>
+                        <span class="clock-unit">
+                            <b data-role="seconds">--</b>
+                            <i>Sec</i>
+                        </span>
+                        <p class="clock-status" data-role="status">Calculating…</p>
+                    </div>
+                    <div class="mt-2 small text-secondary">
+                        Last trade: <strong>{{ account.last_trade_date|date:"M j, Y H:i" }}</strong>
+                        · Inactive from: <strong>{{ account.deadline|date:"M j, Y H:i" }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Account details</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Account name</dt>
+                        <dd class="col-sm-7">{{ account.account_name }}</dd>
+
+                        <dt class="col-sm-5">Broker</dt>
+                        <dd class="col-sm-7">{{ account.broker|default:"—" }}</dd>
+
+                        <dt class="col-sm-5">Last trade</dt>
+                        <dd class="col-sm-7">{{ account.last_trade_date|date:"M j, Y H:i" }}</dd>
+
+                        <dt class="col-sm-5">Days since trade</dt>
+                        <dd class="col-sm-7">{{ account.days_since_last_trade }}</dd>
+
+                        <dt class="col-sm-5">Notifications</dt>
+                        <dd class="col-sm-7 mb-0">
+                            <span class="badge {% if account.notify_email %}bg-success{% else %}bg-secondary{% endif %}">Email</span>
+                            <span class="badge {% if account.notify_whatsapp %}bg-success{% else %}bg-secondary{% endif %}">WhatsApp</span>
+                            <span class="badge {% if account.notify_telegram %}bg-success{% else %}bg-secondary{% endif %}">Telegram</span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+                <a href="{% url 'trades:edit' account.pk %}" class="btn btn-outline-primary">Edit</a>
+                <a href="{% url 'trades:delete' account.pk %}" class="btn btn-outline-danger">Delete</a>
+                <a href="{% url 'trades:list' %}" class="btn btn-outline-secondary ms-auto">Back to list</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

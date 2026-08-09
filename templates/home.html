@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Never Lose Your Forex Account to Inactivity{% endblock %}
+
+{% block extra_head %}
+<style>
+    .hero {
+        background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+        color: #fff;
+    }
+    .hero .lead { color: #c9d6df; }
+    .feature-icon {
+        width: 64px; height: 64px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 14px;
+        font-size: 1.75rem;
+    }
+    .faq-item .accordion-button { font-weight: 500; }
+    .btn-glow { box-shadow: 0 0 0 0 rgba(13,110,253,.5); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ============================= HERO ============================= -->
+<section class="hero py-5">
+    <div class="container py-5">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-6">
+                <p class="text-uppercase small text-info fw-semibold mb-2">Forex Inactivity Reminder</p>
+                <h1 class="display-4 fw-bold mb-3">
+                    Never lose your forex account to inactivity.
+                </h1>
+                <p class="lead mb-4">
+                    Dormant accounts can be closed or suspended by your broker.
+                    We watch the clock for you and remind you before it's too
+                    late — by email, WhatsApp, or Telegram.
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'accounts:dashboard' %}"
+                           class="btn btn-light btn-lg px-4 btn-glow">Go to Dashboard</a>
+                    {% else %}
+                        <a href="{% url 'account_signup' %}"
+                           class="btn btn-light btn-lg px-4 btn-glow">Get Started</a>
+                        <a href="{% url 'account_login' %}"
+                           class="btn btn-outline-light btn-lg px-4">Login</a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-6 text-center">
+                <div class="display-1 text-info-emphasis">⏱️</div>
+                <p class="small text-white-50 mt-2">Live inactivity countdown on every account</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- =========================== FEATURES =========================== -->
+<section class="py-5 bg-light">
+    <div class="container py-4">
+        <h2 class="text-center mb-5">Everything you need to stay active</h2>
+        <div class="row g-4">
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 border-0 shadow-sm text-center p-3">
+                    <div class="feature-icon bg-primary-subtle text-primary mx-auto mb-3">⏳</div>
+                    <h5 class="fw-semibold">Countdown Clock</h5>
+                    <p class="text-secondary mb-0 small">
+                        A live clock on every account shows exactly how long
+                        since your last trade and how many days you have left.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 border-0 shadow-sm text-center p-3">
+                    <div class="feature-icon bg-success-subtle text-success mx-auto mb-3">✉️</div>
+                    <h5 class="fw-semibold">Email Reminders</h5>
+                    <p class="text-secondary mb-0 small">
+                        Automatic emails at your chosen day marks, so the reminder
+                        lands in your inbox before it's critical.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 border-0 shadow-sm text-center p-3">
+                    <div class="feature-icon bg-success-subtle text-success mx-auto mb-3">💬</div>
+                    <h5 class="fw-semibold">WhatsApp Alerts</h5>
+                    <p class="text-secondary mb-0 small">
+                        Get notified straight to your phone via WhatsApp for
+                        real-time, on-the-go peace of mind.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 border-0 shadow-sm text-center p-3">
+                    <div class="feature-icon bg-info-subtle text-info mx-auto mb-3">📨</div>
+                    <h5 class="fw-semibold">Telegram Bot</h5>
+                    <p class="text-secondary mb-0 small">
+                        A dedicated Telegram bot sends you reminders to any chat,
+                        wherever you are.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- =========================HOW IT WORKS ========================== -->
+<section class="py-5">
+    <div class="container py-3">
+        <h2 class="text-center mb-5">How it works</h2>
+        <div class="row g-4 text-center">
+            <div class="col-md-4">
+                <div class="p-4">
+                    <div class="fs-1">1️⃣</div>
+                    <h5 class="mt-2">Sign up</h5>
+                    <p class="text-secondary mb-0">
+                        Create an account with just your email. No username needed.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-4">
+                    <div class="fs-1">2️⃣</div>
+                    <h5 class="mt-2">Add your accounts</h5>
+                    <p class="text-secondary mb-0">
+                        Register each forex account and pick your reminder channels.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-4">
+                    <div class="fs-1">3️⃣</div>
+                    <h5 class="mt-2">Relax</h5>
+                    <p class="text-secondary mb-0">
+                        We send reminders at your chosen day marks so you never
+                        go silent too long.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================== FAQ ============================== -->
+<section class="py-5 bg-light">
+    <div class="container py-3" style="max-width: 800px;">
+        <h2 class="text-center mb-5">Frequently asked questions</h2>
+
+        <div class="accordion" id="faqAccordion">
+
+            <div class="accordion-item">
+                <h3 class="accordion-header" id="faqHeading1">
+                    <button class="accordion-button" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#faqCollapse1"
+                            aria-expanded="true" aria-controls="faqCollapse1">
+                        What counts as an "inactive" forex account?
+                    </button>
+                </h3>
+                <div id="faqCollapse1" class="accordion-collapse collapse show"
+                     aria-labelledby="faqHeading1" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        Most brokers consider an account dormant after a period
+                        without any trading activity (often 30 days). We let you
+                        track exactly how long it's been since your last trade
+                        and alert you well before you hit that cutoff.
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h3 class="accordion-header" id="faqHeading2">
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#faqCollapse2"
+                            aria-expanded="false" aria-controls="faqCollapse2">
+                        How do the reminders work?
+                    </button>
+                </h3>
+                <div id="faqCollapse2" class="accordion-collapse collapse"
+                     aria-labelledby="faqHeading2" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        Once you add an account, we run a daily check. On the day
+                        marks you've chosen (for example, 10, 15, 25, and 30 days
+                        since your last trade) we send a reminder through whichever
+                        channels you've enabled — email, WhatsApp, or Telegram.
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h3 class="accordion-header" id="faqHeading3">
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#faqCollapse3"
+                            aria-expanded="false" aria-controls="faqCollapse3">
+                        Do you store my broker login credentials?
+                    </button>
+                </h3>
+                <div id="faqCollapse3" class="accordion-collapse collapse"
+                     aria-labelledby="faqHeading3" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        No. We never ask for or store your broker login or
+                        password. You simply record your account name, broker,
+                        and the date of your last trade so we can track inactivity.
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h3 class="accordion-header" id="faqHeading4">
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#faqCollapse4"
+                            aria-expanded="false" aria-controls="faqCollapse4">
+                        How do I set up WhatsApp or Telegram reminders?
+                    </button>
+                </h3>
+                <div id="faqCollapse4" class="accordion-collapse collapse"
+                     aria-labelledby="faqHeading4" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        On your profile page you can add your phone number (for
+                        WhatsApp) and your Telegram chat ID. Then, when adding an
+                        account, simply tick the channels you want to use. Each
+                        account can have its own combination of channels.
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h3 class="accordion-header" id="faqHeading5">
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#faqCollapse5"
+                            aria-expanded="false" aria-controls="faqCollapse5">
+                        Can I change how often I'm reminded?
+                    </button>
+                </h3>
+                <div id="faqCollapse5" class="accordion-collapse collapse"
+                     aria-labelledby="faqHeading5" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        Yes. The reminder day marks are fully configurable. You can
+                        set your own schedule (for example, every 7 days, or just
+                        at 20, 25, and 30 days) using the built-in
+                        <code>set_reminder_days</code> management command.
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <h3 class="accordion-header" id="faqHeading6">
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#faqCollapse6"
+                            aria-expanded="false" aria-controls="faqCollapse6">
+                        Is my personal data shared?
+                    </button>
+                </h3>
+                <div id="faqCollapse6" class="accordion-collapse collapse"
+                     aria-labelledby="faqHeading6" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        No. Your email, phone number, and Telegram chat ID are used
+                        solely to send you reminders. We never sell or share your
+                        personal information with third parties.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Bottom CTA -->
+        <div class="text-center mt-5">
+            <h3 class="h5 mb-3">Ready to protect your accounts?</h3>
+            {% if user.is_authenticated %}
+                <a href="{% url 'accounts:dashboard' %}"
+                   class="btn btn-primary btn-lg px-4">Go to Dashboard</a>
+            {% else %}
+                <a href="{% url 'account_signup' %}"
+                   class="btn btn-primary btn-lg px-4">Get Started</a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{% endblock %}

@@ -1,0 +1,97 @@
+/* Countdown clock styles — Orbitron digital font */
+
+/* Digital display units */
+.clock {
+    --clock-color: #33ff99;          /* default green glow */
+    --clock-dim: rgba(255, 255, 255, 0.35);
+    font-family: "Orbitron", monospace;
+}
+
+.clock .clock-unit {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 76px;
+}
+
+.clock .clock-unit b {
+    font-family: "Orbitron", monospace;
+    font-weight: 700;
+    font-size: clamp(2.2rem, 6vw, 4.5rem);
+    line-height: 1;
+    color: var(--clock-color);
+    text-shadow: 0 0 12px var(--clock-color);
+}
+
+.clock .clock-unit i {
+    font-family: "Orbitron", monospace;
+    font-style: normal;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--clock-dim);
+    margin-top: 0.4rem;
+}
+
+.clock .clock-sep {
+    font-family: "Orbitron", monospace;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    color: var(--clock-dim);
+    align-self: center;
+}
+
+.clock .clock-status {
+    margin-top: 1rem;
+    font-family: "Orbitron", monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    color: var(--clock-color);
+}
+
+/* State: warning / critical / expired */
+.clock.is-warning {
+    --clock-color: #ffd166;
+    --clock-dim: rgba(255, 209, 102, 0.45);
+}
+.clock.is-critical,
+.clock.is-expired {
+    --clock-color: #ff5252;
+    --clock-dim: rgba(255, 82, 82, 0.45);
+}
+
+.clock .status-danger {
+    color: #ff5252;
+    text-shadow: 0 0 10px #ff5252;
+    font-weight: 700;
+}
+
+/* ---- Small live badges for the list page ---- */
+.clock-badge {
+    display: inline-block;
+    font-family: "Orbitron", sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.3rem 0.65rem;
+    border-radius: 12px;
+    color: #fff;
+    white-space: nowrap;
+    transition: background-color 0.3s ease;
+}
+
+.clock-badge.badge-ok {
+    background-color: #198754;
+}
+.clock-badge.badge-warning {
+    background-color: #f1a70b;
+    color: #212529;
+}
+.clock-badge.badge-critical {
+    background-color: #dc3545;
+}
+.clock-badge.badge-expired {
+    background-color: #495057;
+    color: #fff;
+}

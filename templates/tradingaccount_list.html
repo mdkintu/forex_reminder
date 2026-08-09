@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}My Trading Accounts — Forex Reminder{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">My Trading Accounts</h1>
+        <a href="{% url 'trades:add' %}" class="btn btn-primary">
+            + Add account
+        </a>
+    </div>
+
+    {% if accounts %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle shadow-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">Account</th>
+                    <th scope="col">Broker</th>
+                    <th scope="col">Last trade</th>
+                    <th scope="col" class="text-center">Time left</th>
+                    <th scope="col">Notifications</th>
+                    <th scope="col" class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for account in accounts %}
+                <tr data-deadline="{{ account.deadline_iso }}">
+                    <td>
+                        <a href="{% url 'trades:detail' account.pk %}" class="fw-semibold text-decoration-none">
+                            {{ account.account_name }}
+                        </a>
+                    </td>
+                    <td>{{ account.broker|default:"—" }}</td>
+                    <td>{{ account.last_trade_date|date:"M j, Y H:i" }}</td>
+                    <td class="text-center">
+                        <!-- Live countdown badge; kept up-to-date by js/clock.js -->
+                        <span class="clock-badge" data-deadline="{{ account.deadline_iso }}"
+                              data-label="days left">…</span>
+                    </td>
+                    <td>
+                        <span class="small text-secondary">
+                            {% if account.notify_email %}📧{% endif %}
+                            {% if account.notify_whatsapp %}💬{% endif %}
+                            {% if account.notify_telegram %}✈️{% endif %}
+                            {% if not account.notify_email and not account.notify_whatsapp and not account.notify_telegram %}
+                                Off
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'trades:detail' account.pk %}" class="btn btn-outline-primary">View</a>
+                            <a href="{% url 'trades:edit' account.pk %}" class="btn btn-outline-secondary">Edit</a>
+                            <a href="{% url 'trades:delete' account.pk %}" class="btn btn-outline-danger">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 border rounded-3 bg-light">
+        <div class="fs-1 mb-3">📭</div>
+        <h2 class="h5">No trading accounts yet</h2>
+        <p class="text-secondary">Add your first forex account to start tracking inactivity.</p>
+        <a href="{% url 'trades:add' %}" class="btn btn-primary">Add your first account</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
