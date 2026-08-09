@@ -1,0 +1,17 @@
+# Cloudflare Named Tunnel config for fair.tergym.com
+#
+# Steps (see README deployment notes):
+#   1. Add your "anchor" domain (e.g. your-new-domain.com) to a Cloudflare account.
+#   2. Create a named tunnel:  cloudflared tunnel create fair-tunnel
+#   3. Bind a hostname:        cloudflared tunnel route dns fair-tunnel app.your-new-domain.com
+#   4. At Porkbun, CNAME:      fair -> app.your-new-domain.com
+#   5. Save this file as deploy/cloudflared_config.yml (fill in real values), then:
+#        cloudflared tunnel --config deploy/cloudflared_config.yml run fair-tunnel
+
+tunnel: <TUNNEL_ID>
+credentials-file: /home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_reminder/deploy/.fair-tunnel-creds.json
+
+ingress:
+  - hostname: app.your-new-domain.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404
