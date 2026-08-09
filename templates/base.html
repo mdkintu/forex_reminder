@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Forex Inactivity Reminder{% endblock %}</title>
+    <title>{% block title %}Forex Account Inactivity Reminder (FAIR){% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +19,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="{% url 'accounts:home' %}">
-                📈 Forex Reminder
+                📈 FAIR <span class="text-secondary small fw-light">Forex Account Inactivity Reminder</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                     data-bs-target="#navbarNav" aria-controls="navbarNav"
@@ -82,7 +82,7 @@
     <!-- Footer -->
     <footer class="bg-dark text-light text-center py-3 mt-auto">
         <div class="container">
-            <small>&copy; 2025 Forex Inactivity Reminder. All rights reserved.</small>
+            <small>&copy; 2025 Forex Account Inactivity Reminder (FAIR). All rights reserved.</small>
         </div>
     </footer>
 
@@ -91,3 +91,4 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
+

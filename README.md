@@ -1,9 +1,10 @@
-# Forex Inactivity Reminder
+# Forex Account Inactivity Reminder (FAIR)
 
-A Django application that monitors your forex trading accounts and reminds you
-via email, WhatsApp, and/or Telegram when you've been inactive too long. It
-tracks the days since your last trade on each account and sends reminders on a
-configurable schedule of day numbers (default: 10, 15, 25–30).
+**FAIR** (Forex Account Inactivity Reminder) is a Django application that
+monitors your forex trading accounts and reminds you via email, WhatsApp,
+and/or Telegram when you've been inactive too long. It tracks the days since
+your last trade on each account and sends reminders on a configurable schedule
+of day numbers (default: 10, 15, 25–30).
 
 Built with:
 

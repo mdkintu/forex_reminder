@@ -34,7 +34,7 @@ def _send_email(account, day_number) -> None:
         f"{day_number} days.\n\n"
         f"Last trade was on {account.last_trade_date:%Y-%m-%d %H:%M}.\n\n"
         f"Please place a trade to keep the account active, or contact your broker.\n\n"
-        f"— Forex Inactivity Reminder"
+        f"— Forex Account Inactivity Reminder (FAIR)"
     )
     send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [account.user.email])
 
