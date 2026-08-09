@@ -1,0 +1,23 @@
+# Systemd service for the Celery beat scheduler (triggers the daily reminder task)
+#
+# Install with:
+#   sudo cp deploy/celery-beat.service /etc/systemd/system/fair-celery-beat.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fair-celery-beat
+
+[Unit]
+Description=Celery beat for FAIR (Forex Account Inactivity Reminder)
+After=network.target redis-server.service
+
+[Service]
+Type=simple
+User=mark
+Group=mark
+WorkingDirectory=/home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_reminder
+Environment=PATH=/home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_venv/bin:/usr/bin:/bin
+ExecStart=/home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_venv/bin/celery -A forex_reminder beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

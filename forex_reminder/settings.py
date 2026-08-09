@@ -25,6 +25,24 @@ ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS", default="localhost,127.0.0.1"
 ).split(",")
 
+# When behind an Nginx reverse proxy that terminates TLS, Nginx sets the
+# X-Forwarded-Proto header. Telling Django to trust it lets request.is_secure()
+# (and thus HTTPS redirects + secure cookies) work correctly.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Allow secure HTTPS POSTs (login, signup, etc.) from these origins.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in config("CSRF_TRUSTED_ORIGINS", default="").split(",")
+    if origin.strip()
+]
+
+# Only enforce secure cookies when not in DEBUG.
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = False  # Nginx handles the HTTP -> HTTPS redirect
+
 
 # Application definition
 

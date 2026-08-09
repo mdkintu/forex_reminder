@@ -1,0 +1,23 @@
+# Systemd service for Gunicorn (the Django app server for fair.tergym.com)
+#
+# Install with:
+#   sudo cp deploy/gunicorn.service /etc/systemd/system/fair-gunicorn.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fair-gunicorn
+
+[Unit]
+Description=Gunicorn for FAIR (Forex Account Inactivity Reminder)
+After=network.target
+
+[Service]
+User=mark
+Group=mark
+WorkingDirectory=/home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_reminder
+# 3 workers is a sensible default for a small app on a home machine.
+ExecStart=/home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 forex_reminder.wsgi:application
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

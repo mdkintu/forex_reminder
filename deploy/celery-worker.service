@@ -1,0 +1,23 @@
+# Systemd service for the Celery worker (processes reminder tasks)
+#
+# Install with:
+#   sudo cp deploy/celery-worker.service /etc/systemd/system/fair-celery-worker.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fair-celery-worker
+
+[Unit]
+Description=Celery worker for FAIR (Forex Account Inactivity Reminder)
+After=network.target redis-server.service
+
+[Service]
+Type=simple
+User=mark
+Group=mark
+WorkingDirectory=/home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_reminder
+Environment=PATH=/home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_venv/bin:/usr/bin:/bin
+ExecStart=/home/mark/Downloads/markdesktop/PROJECTS/REMINDER/forex_venv/bin/celery -A forex_reminder worker -l info --concurrency=1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
