@@ -42,6 +42,24 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+# --- Security hardening (only when DEBUG is off, i.e. production) ---
+if not DEBUG:
+    # Redirect all HTTP traffic to HTTPS (handled by Django when no proxy).
+    SECURE_SSL_REDIRECT = True
+    # Cookies only sent over HTTPS.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # HTTP Strict Transport Security (one year). Requires the whole site over
+    # HTTPS with a valid SSL cert; disable if the cert isn't in place yet.
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = False
+    # Referrer policy so redirects work correctly behind it.
+    SECURE_REFERRER_POLICY = "same-origin"
+    # Trust the HTTPS header set by cPanel's front-end proxy so
+    # SECURE_SSL_REDIRECT and the secure cookies above work behind it.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 
 # Application definition
 
