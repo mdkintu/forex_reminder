@@ -8,6 +8,16 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 from decouple import config
 
+# If using MySQL, make PyMySQL act as the MySQLdb driver that Django expects
+# (avoids needing the C-based mysqlclient library on shared hosting).
+if config("DB_ENGINE", default="django.db.backends.sqlite3") == "django.db.backends.mysql":
+    try:
+        import pymysql
+
+        pymysql.install_as_MySQLdb()
+    except ImportError:
+        pass
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
