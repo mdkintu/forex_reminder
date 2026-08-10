@@ -7,6 +7,9 @@ twilio==9.10.9
 python-telegram-bot==22.8
 python-decouple==3.8
 
+# PostgreSQL driver (used on cPanel/hosting)
+psycopg2-binary==2.9.10
+
 # Testing
 pytest==8.4.1
 pytest-django==4.8.0
