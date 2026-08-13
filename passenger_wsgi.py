@@ -22,3 +22,13 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "forex_reminder.settings")
 #     os.environ["PATH"] = os.path.join(VENV, "bin") + os.pathsep + os.environ["PATH"]
 
 application = get_wsgi_application()
+
+# Serve collected static files (/static/...) directly from Django so the
+# admin and site CSS/JS are served even though cPanel's Passenger app has no
+# "Static URL/Path" field to map /static/ to the collected staticfiles/ dir.
+# In production you'd normally let the web server (Nginx/Apache) serve static
+# files instead, but on cPanel/Passenger this is the simplest reliable option.
+from django.contrib.staticfiles.handlers import StaticFilesHandler
+
+application = StaticFilesHandler(application)
+
