@@ -98,7 +98,8 @@ def check_and_send_reminders() -> int:
     reminder_days = ReminderSchedule.get().days()
 
     for account in TradingAccount.objects.select_related("user").all():
-        days_since = (now - account.last_trade_date).days
+        # Days since last trade in the account owner's local timezone.
+        days_since = account.days_since_last_trade
 
         if days_since not in reminder_days:
             continue

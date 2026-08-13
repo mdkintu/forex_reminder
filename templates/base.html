@@ -88,6 +88,30 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'js/clock.js' %}"></script>
+
+    {% if user.is_authenticated %}
+    {# Auto-detect the user's timezone (once) so "days since trade" is computed
+       in their local calendar day, not UTC. Sends ?tz= to the dashboard. #}
+    <script>
+    (function () {
+        var detected = (function () {
+            try { return new Intl.DateTimeFormat().resolvedOptions().timeZone; }
+            catch (e) { return null; }
+        })();
+        if (!detected) return;
+        // Only bother if the server hasn't saved a timezone for this user yet.
+        var hasTz = "{{ user.timezone }}" && "{{ user.timezone }}" !== "UTC";
+        // Ping once per session so we don't loop. Use a flag in sessionStorage.
+        if (!hasTz && !sessionStorage.getItem("tz_auto_detected")) {
+            sessionStorage.setItem("tz_auto_detected", "1");
+            fetch(location.pathname + location.search +
+                  (location.search ? "&tz=" : "?tz=") + encodeURIComponent(detected),
+                  { method: "GET", credentials: "same-origin" });
+        }
+    })();
+    </script>
+    {% endif %}
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

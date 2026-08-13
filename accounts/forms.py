@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone as django_timezone
 
 from .models import User
 
@@ -14,6 +15,7 @@ class ProfileForm(forms.ModelForm):
             "last_name",
             "phone_number",
             "telegram_chat_id",
+            "timezone",
         ]
         widgets = {
             "email": forms.EmailInput(
@@ -37,4 +39,9 @@ class ProfileForm(forms.ModelForm):
                     "placeholder": "Your Telegram chat id, e.g. 123456789",
                 }
             ),
+            "timezone": forms.Select(
+                choices=[(tz, tz) for tz in django_timezone.zoneinfo.available_timezones()],
+                attrs={"class": "form-control"},
+            ),
         }
+

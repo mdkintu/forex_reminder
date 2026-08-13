@@ -93,8 +93,17 @@ class TradingAccount(models.Model):
 
     @property
     def days_since_last_trade(self):
-        """Whole days elapsed since the last trade."""
-        return max(0, (timezone.now() - self.last_trade_date).days)
+        """Whole days elapsed since the last trade, in the user's timezone.
+
+        Computing this in the owner's local timezone (rather than UTC) makes
+        the "days" line up with the user's calendar day, which matters for
+        global users. Falls back to UTC if the user has no timezone set.
+        """
+        local_now = timezone.now().astimezone(self.user.get_timezone())
+        local_last = timezone.localtime(
+            self.last_trade_date, self.user.get_timezone()
+        )
+        return max(0, (local_now.date() - local_last.date()).days)
 
     @property
     def reminder_days(self):

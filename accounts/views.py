@@ -20,6 +20,9 @@ def dashboard(request):
     Shows the user's trading accounts and upcoming deadlines so they can act
     before accounts go inactive.
     """
+    # Auto-detect timezone from the browser (sent via ?tz=) when needed.
+    _save_detected_timezone(request)
+
     accounts = request.user.trading_accounts.order_by("last_trade_date")
     return render(
         request,
@@ -30,6 +33,18 @@ def dashboard(request):
             "threshold": TradingAccount.INACTIVITY_THRESHOLD_DAYS,
         },
     )
+
+
+def _save_detected_timezone(request) -> None:
+    """Store the browser-detected timezone on the user (once) if provided."""
+    tz = request.GET.get("tz") or request.POST.get("tz")
+    if not tz:
+        return
+    user = request.user
+    if user.is_authenticated and not user.timezone:
+        user.set_timezone_from_js(tz)
+        if user.timezone:
+            user.save(update_fields=["timezone"])
 
 
 @login_required

@@ -44,6 +44,11 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=20, blank=True)
     telegram_chat_id = models.CharField(max_length=100, blank=True)
+    # IANA timezone name (e.g. "Africa/Nairobi", "America/New_York"). Auto
+    # detected from the user's browser on first login, with a manual override.
+    # Used to compute "days since last trade" in the user's local timezone so
+    # inactivity reminders land on the right day for global users.
+    timezone = models.CharField(max_length=64, blank=True, default="UTC")
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []  # Email is already required via USERNAME_FIELD
@@ -52,3 +57,25 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+    def get_timezone(self):
+        """Return a usable ``tzinfo`` for the user's timezone (fallback UTC)."""
+        import zoneinfo
+
+        try:
+            return zoneinfo.ZoneInfo(self.timezone or "UTC")
+        except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+            return zoneinfo.ZoneInfo("UTC")
+
+    def set_timezone_from_js(self, value):
+        """Safely store a browser-detected IANA timezone name."""
+        import zoneinfo
+
+        if not value:
+            return
+        try:
+            zoneinfo.ZoneInfo(value)  # raises if invalid
+            if self.timezone != value:
+                self.timezone = value
+        except (zoneinfo.ZoneInfoNotFoundError, ValueError, TypeError):
+            pass  # ignore junk from the client
