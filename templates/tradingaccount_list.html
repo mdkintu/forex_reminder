@@ -40,6 +40,9 @@
                         <!-- Live countdown badge; kept up-to-date by js/clock.js -->
                         <span class="clock-badge" data-deadline="{{ account.deadline_iso }}"
                               data-label="days left">…</span>
+                        <div class="small text-success mt-1">
+                            ⏰ {{ account.next_reminder_label }}
+                        </div>
                     </td>
                     <td>
                         <span class="small text-secondary">

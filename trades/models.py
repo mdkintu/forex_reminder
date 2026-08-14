@@ -120,6 +120,104 @@ class TradingAccount(models.Model):
         """Days left before reaching the 30-day inactivity threshold."""
         return max(0, self.INACTIVITY_THRESHOLD_DAYS - self.days_since_last_trade)
 
+    def next_reminder_datetime(self):
+        """The next datetime a reminder will be sent (user's local time), or None.
+
+        Algorithm (per the delivery rules):
+        * On a schedule day a reminder goes out at each configured local hour
+          (normally 09:00 and 14:00), but a later-in-day slot is skipped if the
+          user placed a trade after the previous slot that day.
+        * If today is a schedule day and a send hour is still ahead, that is the
+          next reminder.
+        * Otherwise the next reminder is the next upcoming schedule day at its
+          first send hour.
+        * Returns None when there is no upcoming reminder (e.g. the account is
+          already inactive / past the schedule).
+        """
+        send_hours = sorted(set(getattr(settings, "REMINDER_SEND_HOURS", [9, 14])))
+        if not send_hours:
+            return None
+        schedule = sorted(self.reminder_days)
+        if not schedule:
+            return None
+
+        tz = self.user.get_timezone()
+        now_local = timezone.localtime(timezone.now(), tz)
+        days_since = self.days_since_last_trade
+        today = now_local.date()
+
+        def traded_after(previous_hour):
+            """True if the user last traded after `previous_hour` today (local)."""
+            prev_dt = now_local.replace(
+                hour=previous_hour, minute=0, second=0, microsecond=0
+            )
+            return timezone.localtime(self.last_trade_date, tz) > prev_dt
+
+        # Helper to build a send datetime for a given date + hour.
+        def at_hour(d, hour):
+            return timezone.make_aware(
+                timezone.datetime(d.year, d.month, d.day, hour, 0, 0),
+                tz,
+            )
+
+        # Case 1: today is a schedule day -> next slot today, if any.
+        if days_since in schedule:
+            for hour in send_hours:
+                slot_dt = at_hour(today, hour)
+                if slot_dt <= now_local:
+                    continue
+                # Skip the slot only if a prior slot fired and the user traded
+                # since that prior slot (later-in-day skip rule).
+                prior = [h for h in send_hours if h < hour]
+                if prior and traded_after(max(prior)):
+                    continue
+                return slot_dt
+            # All today's slots are past -> fall through to next schedule day.
+
+        # Case 2: find the next schedule day strictly greater than today.
+        future = [d for d in schedule if d > days_since]
+        if future:
+            next_day = min(future)
+            return at_hour(today + timezone.timedelta(days=next_day - days_since), send_hours[0])
+
+        # No next schedule day (e.g. past the last mark / inactive).
+        return None
+
+    @property
+    def time_until_next_reminder(self):
+        """A timedelta (or None) until the next reminder fires."""
+        nxt = self.next_reminder_datetime()
+        if nxt is None:
+            return None
+        return nxt - timezone.now()
+
+    @property
+    def next_reminder_label(self):
+        """A human-friendly label for the time until the next reminder.
+
+        E.g. "today at 2:00 PM", "in 2 days (10-day mark)", or "no upcoming
+        reminder". Time is shown in the user's local timezone.
+        """
+        nxt = self.next_reminder_datetime()
+        if nxt is None:
+            return "No upcoming reminder"
+        tz = self.user.get_timezone()
+        nxt_local = nxt.astimezone(tz)
+        delta = nxt_local - timezone.localtime(timezone.now(), tz)
+        total_days = delta.days
+        total_hours = delta.seconds // 3600
+
+        when = nxt_local.strftime("%I:%M %p").lstrip("0")
+        if total_days <= 0 and total_hours < 1:
+            # Under an hour away.
+            minutes = max(1, delta.seconds // 60)
+            return f"In {minutes} min ({when})"
+        if total_days <= 0:
+            return f"Today at {when}"
+        if total_days == 1:
+            return f"Tomorrow at {when}"
+        return f"In {total_days} days at {when}"
+
     @property
     def is_inactive(self):
         """True when the account has crossed the inactivity threshold."""
