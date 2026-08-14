@@ -12,6 +12,18 @@ from .notifications import send_telegram_message, send_whatsapp_message
 logger = logging.getLogger(__name__)
 
 
+def _recipient_name(account):
+    """A display name for the reminder recipient.
+
+    Prefers the user's first or last name; falls back to their email if no
+    name is saved.
+    """
+    user = account.user
+    if user.first_name or user.last_name:
+        return " ".join(n for n in (user.first_name, user.last_name) if n).strip()
+    return user.email
+
+
 # ============================================================================
 # Notification senders
 # ----------------------------------------------------------------------------
@@ -26,11 +38,13 @@ def _send_email(account, day_number) -> None:
 
     Uses settings.EMAIL_BACKEND (console for dev, SMTP for production).
     """
+    name = _recipient_name(account)
     subject = f"Inactivity reminder: {account.account_name}"
     message = (
-        f"Hello,\n\n"
+        f"Hello {name},\n\n"
         f"Your trading account '{account.account_name}' "
-        f"(broker: {account.broker or 'unknown'}) has had no trade for "
+        f"(account #: {account.account_number or 'n/a'}, "
+        f"broker: {account.broker or 'unknown'}) has had no trade for "
         f"{day_number} days.\n\n"
         f"Last trade was on {account.last_trade_date:%Y-%m-%d %H:%M}.\n\n"
         f"Please place a trade to keep the account active, or contact your broker.\n\n"
@@ -41,9 +55,11 @@ def _send_email(account, day_number) -> None:
 
 def _send_whatsapp(account, day_number) -> None:
     """Send the inactivity reminder via WhatsApp to the user's phone number."""
+    name = _recipient_name(account)
     body = (
-        f"⚠️ Inactivity reminder: account '{account.account_name}' "
-        f"(broker: {account.broker or 'unknown'}) has had no trade for "
+        f"⚠️ Hello {name}, inactivity reminder: account "
+        f"'{account.account_name}' (#{account.account_number or 'n/a'}, "
+        f"broker: {account.broker or 'unknown'}) has had no trade for "
         f"{day_number} days. Please place a trade to keep it active."
     )
     send_whatsapp_message(account.user.phone_number, body)
@@ -51,9 +67,11 @@ def _send_whatsapp(account, day_number) -> None:
 
 def _send_telegram(account, day_number) -> None:
     """Send the inactivity reminder via Telegram to the user's chat id."""
+    name = _recipient_name(account)
     text = (
-        f"⚠️ Inactivity reminder: account '{account.account_name}' "
-        f"(broker: {account.broker or 'unknown'}) has had no trade for "
+        f"⚠️ Hello {name}, inactivity reminder: account "
+        f"'{account.account_name}' (#{account.account_number or 'n/a'}, "
+        f"broker: {account.broker or 'unknown'}) has had no trade for "
         f"{day_number} days. Please place a trade to keep it active."
     )
     send_telegram_message(account.user.telegram_chat_id, text)
@@ -83,25 +101,33 @@ def _channel_is_enabled(account, channel) -> bool:
 def check_and_send_reminders() -> int:
     """Check all trading accounts and send due inactivity reminders.
 
-    Reminder day numbers are read from the global :class:`ReminderSchedule`,
-    so the user can configure them interactively (multiple values) via the
-    ``set_reminder_days`` management command.
-
-    For each account whose days-since-last-trade is in the schedule, a
-    reminder is sent on every enabled channel (unless one was already sent
-    for that account+day+channel).
+    On a scheduled reminder day (days-since-last-trade in the global
+    :class:`ReminderSchedule`), the reminder is sent once per enabled channel
+    at each configured local delivery hour (settings.REMINDER_SEND_HOURS, e.g.
+    9 AM and 2 PM). The task is driven by a cron that runs at least as often
+    as the smallest interval between those hours; it only sends when the
+    account owner's local hour matches a configured delivery hour, recording
+    each (account, day, channel, hour) in :class:`ReminderHistory` so the same
+    slot is never sent twice.
 
     Returns the number of reminders sent.
     """
-    now = timezone.now()
     sent_count = 0
     reminder_days = ReminderSchedule.get().days()
+    send_hours = getattr(settings, "REMINDER_SEND_HOURS", [9, 14])
 
     for account in TradingAccount.objects.select_related("user").all():
         # Days since last trade in the account owner's local timezone.
         days_since = account.days_since_last_trade
 
         if days_since not in reminder_days:
+            continue
+
+        # The account owner's current local wall-clock hour (0-23).
+        local_hour = timezone.localtime(timezone.now(), account.user.get_timezone()).hour
+
+        # Only act when we're inside one of the configured delivery windows.
+        if local_hour not in send_hours:
             continue
 
         for channel in ReminderHistory.Channel.values:  # email, whatsapp, telegram
@@ -112,6 +138,7 @@ def check_and_send_reminders() -> int:
                 account=account,
                 day_number=days_since,
                 channel=channel,
+                slot_hour=local_hour,
             ).exists()
             if already_sent:
                 continue
@@ -123,6 +150,7 @@ def check_and_send_reminders() -> int:
                         day_number=days_since,
                         channel=channel,
                         status="pending",
+                        slot_hour=local_hour,
                     )
                     SENDERS[channel](account, days_since)
 
@@ -130,19 +158,21 @@ def check_and_send_reminders() -> int:
                     history.save(update_fields=["status"])
                     sent_count += 1
                     logger.info(
-                        "[reminder] Sent '%s' reminder for account '%s' (day %s).",
+                        "[reminder] Sent '%s' reminder for account '%s' (day %s, %02d:00 local).",
                         channel,
                         account.account_name,
                         days_since,
+                        local_hour,
                     )
             except IntegrityError:
                 # A concurrent worker created the record first — skip it.
                 logger.info(
                     "[reminder] Duplicate reminder skipped for account '%s' "
-                    "(day %s, channel %s).",
+                    "(day %s, channel %s, hour %s).",
                     account.account_name,
                     days_since,
                     channel,
+                    local_hour,
                 )
             except Exception as exc:  # noqa: BLE001 - log and continue
                 logger.exception(

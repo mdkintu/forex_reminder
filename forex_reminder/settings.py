@@ -269,6 +269,12 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes hard limit
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
+# Reminder delivery times (24h local hours). On a scheduled reminder day, the
+# reminder is sent once per channel at each of these local hours (e.g. 9 AM
+# and 2 PM). The cron runs frequently; the task only acts when the user's
+# local hour matches a value here.
+REMINDER_SEND_HOURS = [9, 14]
+
 # Email (used by the reminder task). In development this defaults to the
 # console backend (prints emails to stdout). To send real email, set
 # EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend and the

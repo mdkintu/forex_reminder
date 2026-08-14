@@ -73,6 +73,11 @@ class TradingAccount(models.Model):
         related_name="trading_accounts",
     )
     account_name = models.CharField(max_length=100)
+    account_number = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="The account number for this trading account (e.g. brokerage account number).",
+    )
     broker = models.CharField(max_length=100, blank=True)
     last_trade_date = models.DateTimeField(default=timezone.now)
     notify_email = models.BooleanField(default=True)
@@ -151,12 +156,15 @@ class ReminderHistory(models.Model):
     sent_at = models.DateTimeField(auto_now_add=True)
     channel = models.CharField(max_length=20, choices=Channel.choices)
     status = models.CharField(max_length=20, default="sent")
+    # The local hour (0-23) this reminder was intended for, so the two daily
+    # delivery slots (e.g. 9 AM and 2 PM) are each recorded separately.
+    slot_hour = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["account", "day_number", "channel"],
-                name="unique_reminder_per_account_day_channel",
+                fields=["account", "day_number", "channel", "slot_hour"],
+                name="unique_reminder_per_account_day_channel_slot",
             )
         ]
         ordering = ["-sent_at"]

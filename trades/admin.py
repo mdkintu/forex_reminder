@@ -12,6 +12,7 @@ class ReminderHistoryInline(admin.TabularInline):
 class TradingAccountAdmin(admin.ModelAdmin):
     list_display = [
         "account_name",
+        "account_number",
         "user",
         "broker",
         "last_trade_date",
@@ -25,14 +26,14 @@ class TradingAccountAdmin(admin.ModelAdmin):
         "notify_telegram",
         "user",
     ]
-    search_fields = ["account_name", "broker", "user__email"]
+    search_fields = ["account_name", "account_number", "broker", "user__email"]
     inlines = [ReminderHistoryInline]
 
 
 @admin.register(ReminderHistory)
 class ReminderHistoryAdmin(admin.ModelAdmin):
-    list_display = ["account", "day_number", "channel", "status", "sent_at"]
-    list_filter = ["channel", "status"]
+    list_display = ["account", "day_number", "channel", "slot_hour", "status", "sent_at"]
+    list_filter = ["channel", "status", "slot_hour"]
     search_fields = ["account__account_name"]
 
 

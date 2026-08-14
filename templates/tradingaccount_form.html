@@ -36,6 +36,15 @@
                 </div>
 
                 <div class="mb-3">
+                    <label class="form-label" for="{{ form.account_number.id_for_label }}">Account number</label>
+                    {{ form.account_number }}
+                    <div class="form-text">Your account number with the broker.</div>
+                    {% for error in form.account_number.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
                     <label class="form-label" for="{{ form.broker.id_for_label }}">Broker <span class="text-secondary">(optional)</span></label>
                     {{ form.broker }}
                     {% for error in form.broker.errors %}

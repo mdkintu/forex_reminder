@@ -10,6 +10,18 @@ import trades.tasks as tasks
 from trades.models import ReminderHistory, ReminderSchedule, TradingAccount
 
 
+@pytest.fixture(autouse=True)
+def fixed_send_hour(settings):
+    """Make the task act now.
+
+    The task only sends when the local hour matches settings.REMINDER_SEND_HOURS.
+    Force the send window to include the current hour so tests exercise the
+    sending path regardless of when they run.
+    """
+    current_hour = timezone.localtime(timezone.now()).hour
+    settings.REMINDER_SEND_HOURS = [current_hour]
+
+
 @pytest.fixture
 def schedule():
     """A reminder schedule with a known, small set of day numbers."""
@@ -176,3 +188,65 @@ def test_task_no_reminders_when_no_due_accounts(user, schedule, mock_notifiers):
 
     assert sent == 0
     assert ReminderHistory.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_task_gates_on_send_hour(user, schedule, mock_notifiers, settings):
+    """The task does nothing outside the configured reminder hours."""
+    current_hour = timezone.localtime(timezone.now()).hour
+    # Force a send window that does NOT include the current hour.
+    settings.REMINDER_SEND_HOURS = [(current_hour + 1) % 24]
+
+    TradingAccount.objects.create(
+        user=user,
+        account_name="Due",
+        last_trade_date=timezone.now() - timedelta(days=10),
+        notify_email=True,
+    )
+
+    sent = tasks.check_and_send_reminders()
+
+    assert sent == 0
+    assert ReminderHistory.objects.count() == 0
+    mock_notifiers["send_mail"].assert_not_called()
+
+
+@pytest.mark.django_db
+def test_task_uses_recipient_name_in_email(user, schedule, mock_notifiers):
+    """Email body greets the user by their first/last name."""
+    user.first_name = "Alice"
+    user.last_name = "Smith"
+    user.save()
+    TradingAccount.objects.create(
+        user=user,
+        account_name="Due",
+        account_number="98765",
+        last_trade_date=timezone.now() - timedelta(days=10),
+        notify_email=True,
+    )
+
+    tasks.check_and_send_reminders()
+
+    subject, body, from_email, to = mock_notifiers["send_mail"].call_args.args
+    assert to == [user.email]
+    assert "Alice Smith" in body
+    assert "98765" in body
+
+
+@pytest.mark.django_db
+def test_task_uses_email_when_no_name(user, schedule, mock_notifiers):
+    """Email greets with the email when no name is saved."""
+    user.first_name = ""
+    user.last_name = ""
+    user.save()
+    TradingAccount.objects.create(
+        user=user,
+        account_name="Due",
+        last_trade_date=timezone.now() - timedelta(days=10),
+        notify_email=True,
+    )
+
+    tasks.check_and_send_reminders()
+
+    subject, body, from_email, to = mock_notifiers["send_mail"].call_args.args
+    assert user.email in body

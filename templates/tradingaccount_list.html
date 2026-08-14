@@ -17,6 +17,7 @@
             <thead class="table-dark">
                 <tr>
                     <th scope="col">Account</th>
+                    <th scope="col">Account #</th>
                     <th scope="col">Broker</th>
                     <th scope="col">Last trade</th>
                     <th scope="col" class="text-center">Time left</th>
@@ -32,6 +33,7 @@
                             {{ account.account_name }}
                         </a>
                     </td>
+                    <td>{{ account.account_number|default:"—" }}</td>
                     <td>{{ account.broker|default:"—" }}</td>
                     <td>{{ account.last_trade_date|date:"M j, Y H:i" }}</td>
                     <td class="text-center">

@@ -17,6 +17,7 @@ class TradingAccountForm(forms.ModelForm):
         model = TradingAccount
         fields = [
             "account_name",
+            "account_number",
             "broker",
             "last_trade_date",
             "notify_email",
@@ -25,5 +26,8 @@ class TradingAccountForm(forms.ModelForm):
         ]
         widgets = {
             "account_name": forms.TextInput(attrs={"class": "form-control"}),
+            "account_number": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "e.g. 80812345"}
+            ),
             "broker": forms.TextInput(attrs={"class": "form-control"}),
         }
