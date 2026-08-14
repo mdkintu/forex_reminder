@@ -250,3 +250,36 @@ def test_task_uses_email_when_no_name(user, schedule, mock_notifiers):
 
     subject, body, from_email, to = mock_notifiers["send_mail"].call_args.args
     assert user.email in body
+
+
+@pytest.mark.django_db
+def test_task_skips_later_slot_when_traded_after_morning(
+    user, schedule, mock_notifiers, settings
+):
+    """A later-in-day slot is skipped if the user traded after the morning slot."""
+    tz = user.get_timezone()
+    now_local = timezone.localtime(timezone.now(), tz)
+    morning_hour = now_local.hour - 1  # a morning slot that already passed
+    later_hour = now_local.hour         # the current slot
+    settings.REMINDER_SEND_HOURS = [morning_hour, later_hour]
+
+    # User last traded AFTER the morning slot today (e.g. 11 AM, morning was 9).
+    last_trade = now_local.replace(hour=morning_hour + 1, minute=0, second=0, microsecond=0)
+    TradingAccount.objects.create(
+        user=user,
+        account_name="TradedAt11",
+        last_trade_date=last_trade,
+        notify_email=True,
+    )
+
+    # But days_since must be on the schedule for the task to even try.
+    # Force days_since to a schedule day by setting last_trade_date far back is
+    # overridden by the traded-after check, so instead mock the property.
+    from unittest.mock import patch
+    with patch.object(TradingAccount, "days_since_last_trade", new_callable=mock.PropertyMock, return_value=10):
+        sent = tasks.check_and_send_reminders()
+
+    # The later slot should be skipped because a trade happened after morning.
+    assert sent == 0
+    assert ReminderHistory.objects.count() == 0
+    mock_notifiers["send_mail"].assert_not_called()

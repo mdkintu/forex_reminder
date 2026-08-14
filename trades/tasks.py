@@ -92,6 +92,34 @@ def _channel_is_enabled(account, channel) -> bool:
     }[channel]
 
 
+def _traded_since_last_slot(account, local_hour, send_hours) -> bool:
+    """True if the user traded after the previous reminder slot today.
+
+    For a later slot in the day (e.g. the 2 PM one), if the user placed a
+    trade *after* the previous slot (e.g. the 9 AM one), we skip that later
+    reminder — they already reacted. Only the *first* slot of the day is
+    never skipped by this check.
+    """
+    send_hours = sorted(set(send_hours or []))
+    if not send_hours or local_hour == send_hours[0]:
+        return False  # first slot of the day: nothing before it today
+
+    # The most recent earlier slot that occurred earlier today.
+    earlier = [h for h in send_hours if h < local_hour]
+    if not earlier:
+        return False
+    previous_hour = max(earlier)
+
+    tz = account.user.get_timezone()
+    now_local = timezone.localtime(timezone.now(), tz)
+    # Datetime of the previous slot earlier today (user's local time).
+    previous_slot_time = now_local.replace(
+        hour=previous_hour, minute=0, second=0, microsecond=0
+    )
+    last_local = timezone.localtime(account.last_trade_date, tz)
+    return last_local > previous_slot_time
+
+
 # ============================================================================
 # The background task
 # ============================================================================
@@ -128,6 +156,12 @@ def check_and_send_reminders() -> int:
 
         # Only act when we're inside one of the configured delivery windows.
         if local_hour not in send_hours:
+            continue
+
+        # Skip later-in-the-day slots if the user already traded after the
+        # previous reminder slot (e.g. skip the 2 PM reminder if they traded
+        # after the 9 AM one).
+        if _traded_since_last_slot(account, local_hour, send_hours):
             continue
 
         for channel in ReminderHistory.Channel.values:  # email, whatsapp, telegram
