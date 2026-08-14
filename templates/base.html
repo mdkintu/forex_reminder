@@ -90,8 +90,8 @@
     <script src="{% static 'js/clock.js' %}"></script>
 
     {% if user.is_authenticated %}
-    {# Auto-detect the user's timezone (once) so "days since trade" is computed
-       in their local calendar day, not UTC. Sends ?tz= to the dashboard. #}
+    <!-- {# Auto-detect the user's timezone (once) so "days since trade" is computed
+       in their local calendar day, not UTC. Sends ?tz= to the dashboard. #} -->
     <script>
     (function () {
         var detected = (function () {
