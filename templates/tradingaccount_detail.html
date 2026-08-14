@@ -19,6 +19,7 @@
                     <h2 class="h5 mb-1 text-uppercase text-secondary">Inactivity countdown</h2>
                     <div class="mb-3 text-secondary small">
                         Deadline until <strong>{{ threshold|default:30 }}</strong> days of inactivity reached
+                        — <span class="text-warning-emphasis">most prop firms close accounts at 30 days</span>
                     </div>
 
                     <!-- Deadline is injected here as a JS-friendly ISO timestamp -->
@@ -88,6 +89,48 @@
                 <a href="{% url 'trades:delete' account.pk %}" class="btn btn-outline-danger">Delete</a>
                 <a href="{% url 'trades:list' %}" class="btn btn-outline-secondary ms-auto">Back to list</a>
             </div>
+        </div>
+    </div>
+
+    <!-- Reminder history for this account -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-white fw-semibold">Reminder history</div>
+        <div class="card-body p-0">
+            {% if reminder_history %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Sent</th>
+                                <th scope="col">Day</th>
+                                <th scope="col">Time slot</th>
+                                <th scope="col">Channel</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in reminder_history %}
+                                <tr>
+                                    <td>{{ r.sent_at|date:"M j, Y H:i" }}</td>
+                                    <td>{{ r.day_number }}</td>
+                                    <td>{{ r.slot_hour|stringformat:"02d" }}:00</td>
+                                    <td>{{ r.get_channel_display }}</td>
+                                    <td>
+                                        <span class="badge {% if r.status == 'sent' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                            {{ r.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-4 text-secondary">
+                    No reminders have been sent for this account yet. You'll see a log here
+                    every time a reminder is delivered.
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>

@@ -43,6 +43,8 @@ class TradingAccountDetailView(LoginRequiredMixin, DetailView):
         context["threshold"] = TradingAccount.INACTIVITY_THRESHOLD_DAYS
         # JS-friendly ISO timestamp of the inactivity deadline
         context["deadline"] = self.object.deadline_iso()
+        # Reminder history for this account, newest first.
+        context["reminder_history"] = self.object.reminders.order_by("-sent_at")
         return context
 
 
@@ -83,3 +85,4 @@ class TradingAccountDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_queryset(self):
         return TradingAccount.objects.filter(user=self.request.user)
+
