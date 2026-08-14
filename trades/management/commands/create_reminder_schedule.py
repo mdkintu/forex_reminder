@@ -9,12 +9,22 @@ CELERY_TASK_PATH = "trades.tasks.check_and_send_reminders"
 
 class Command(BaseCommand):
     help = (
-        "Create (or update) the django-celery-beat periodic task that runs "
-        "'check_and_send_reminders' daily at 09:00 UTC."
+        "DEPRECATED. This project ships with two reminder schedulers and we've "
+        "standardized on the cPanel CRON path (the 'send_reminders' command) for "
+        "shared hosting, which needs no Redis/Celery worker.\n\n"
+        "This command manages a django-celery-beat PeriodicTask, which is ONLY "
+        "needed if you later move to Redis + a Celery Beat worker. Do NOT run "
+        "it on cPanel alongside the cron, or reminders would fire twice (once "
+        "from the cron and once from Beat, which also runs at a fixed 09:00 UTC "
+        "rather than the local 9 AM / 2 PM slots). If you do enable Beat later, "
+        "update the schedule below to match settings.REMINDER_SEND_HOURS."
     )
 
     def handle(self, *args, **options):
         # Create/get the crontab schedule: daily at 09:00 UTC.
+        # NOTE: This runs daily at 09:00 UTC, which does NOT match the product's
+        # local 9 AM / 2 PM slots. Update to match REMINDER_SEND_HOURS + local
+        # timezone if you ever adopt Celery Beat as the scheduler.
         schedule, _ = CrontabSchedule.objects.get_or_create(
             minute="0",
             hour="9",

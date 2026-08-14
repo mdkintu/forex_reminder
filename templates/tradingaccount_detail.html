@@ -18,8 +18,8 @@
                 <div class="card-body p-4 text-center">
                     <h2 class="h5 mb-1 text-uppercase text-secondary">Inactivity countdown</h2>
                     <div class="mb-3 text-secondary small">
-                        Deadline until <strong>{{ threshold|default:30 }}</strong> days of inactivity reached
-                        — <span class="text-warning-emphasis">most prop firms close accounts at 30 days</span>
+                        Time until this account would be flagged inactive (a prop-firm
+                        may close it at <strong>{{ threshold|default:30 }}</strong> days).
                     </div>
 
                     <!-- Deadline is injected here as a JS-friendly ISO timestamp -->
@@ -76,10 +76,13 @@
 
                         <dt class="col-sm-5">Next reminder</dt>
                         <dd class="col-sm-7">
-                            <span class="clock-reminder text-success"
-                                  data-reminder="{{ account.next_reminder_iso }}">
+                            <div class="clock-reminder text-success"
+                                 data-reminder="{{ account.next_reminder_iso }}">
                                 {{ account.next_reminder_label }}
-                            </span>
+                            </div>
+                            <div class="small text-secondary mt-1">
+                                Countdown to the next scheduled reminder (9 AM / 2 PM slot)
+                            </div>
                         </dd>
 
                         <dt class="col-sm-5">Notifications</dt>

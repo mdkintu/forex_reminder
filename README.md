@@ -1,16 +1,21 @@
 # Forex Account Inactivity Reminder (FAIR)
 
-**FAIR** (Forex Account Inactivity Reminder) is a Django application that
-monitors your forex trading accounts and reminds you via email, WhatsApp,
-and/or Telegram when you've been inactive too long. It tracks the days since
-your last trade on each account and sends reminders on a configurable schedule
-of day numbers (default: 10, 15, 25–30).
+**FAIR** (Forex Account Inactivity Reminder) is a Django application built for
+**prop-firm and funded traders**. Most prop firms close accounts that go
+30 days without a trade (some are stricter at 14 or 21 days). FAIR monitors
+your trading accounts and reminds you via email, WhatsApp, and/or Telegram
+when you've been inactive too long — so you never lose a funded account to an
+inactivity clause.
+
+It tracks the days since your last trade on each account and sends reminders
+**twice daily (9 AM and 2 PM, in the user's local timezone)** on a configurable
+schedule of day numbers (default: 10, 15, 25–30).
 
 Built with:
 
-- **Django 5.0** + custom email-only user model
+- **Django 5.2 LTS** + custom email-only user model
 - **django-allauth** for authentication (email + password, no username)
-- **Celery + Redis** for the background reminder task (with django-celery-beat)
+- **Celery + Redis** optional background task (see "Scheduling reminders")
 - **Twilio** for WhatsApp reminders
 - **python-telegram-bot** for Telegram reminders
 - **Bootstrap 5** front-end templates
@@ -23,7 +28,7 @@ Built with:
 - [Requirements](#requirements)
 - [Setup](#setup)
 - [Running the app](#running-the-app)
-- [Running Celery](#running-celery)
+- [Scheduling reminders](#scheduling-reminders)
 - [Environment variables](#environment-variables)
 - [The reminder task](#the-reminder-task)
 - [Tests](#tests)
@@ -34,12 +39,17 @@ Built with:
 ## Features
 
 - Users sign in with **email + password** only (no username).
-- Users can manage any number of **trading accounts** (create, view, edit, delete).
-- Each account tracks `last_trade_date`; the app shows a live countdown to the
-  30-day inactivity deadline.
-- A scheduled **Celery task** sends reminders on configurable days after the
-  last trade via the channels the user has enabled.
-- Duplicate reminders are avoided: each account+day+channel combo is recorded
+- Users can manage any number of **trading accounts** (create, view, edit, delete),
+  including an **account number** for each.
+- Each account shows a **live inactivity countdown** to the 30-day deadline and a
+  **live countdown to the next reminder**, both in the user's local timezone.
+- Reminders send **twice per day** (9 AM & 2 PM local) on configured days after
+  the last trade, via whichever channel(s) the user enabled (email, WhatsApp, Telegram).
+- **Reminder history**: each account page logs when every reminder was sent and
+  via which channel.
+- Prop-firm awareness built in — the UI explains that firms close accounts
+  inactive for ~30 days and that a single trade resets the inactivity counter.
+- Duplicate reminders are avoided: each account+day+channel+slot is recorded
   in `ReminderHistory` exactly once.
 - A custom Django admin for users, trading accounts, reminder history, and the
   global reminder schedule.
@@ -49,7 +59,7 @@ Built with:
 ## Requirements
 
 - Python 3.10+
-- Redis (for the Celery broker/backend)
+- Redis **only** if you run the optional Celery scheduler (see below)
 - A virtual environment manager (venv)
 
 ---
@@ -125,43 +135,48 @@ created.
 
 ---
 
-## Running Celery
+## Scheduling reminders
 
-The reminder task runs in the background via Celery. You need Redis running
-first, then start a worker and the beat (scheduler) process.
+Reminders are triggered by running the `send_reminders` management command,
+which calls `check_and_send_reminders`. How it runs depends on your host:
 
-### 1. Start Redis
+### Option A — cPanel / shared hosting cron (recommended, no Redis needed)
+
+Add a `send_reminders` cron entry that runs often enough to catch both daily
+slots (9 AM and 2 PM local). Because the task is cheap and internally gates on
+the user's local hour, running it **hourly** is perfectly fine:
+
+```
+0 * * * *  cd /path/to/project && /path/to/venv/bin/python manage.py send_reminders
+```
+
+(The task only acts when the account owner's local hour matches a configured
+`REMINDER_SEND_HOURS` value — e.g. 9 and 14 — and deduplicates per slot, so an
+hourly cron catches both windows without double-sending.)
+
+### Option B — Celery Beat (optional, needs Redis)
+
+For a non-cPanel deployment you can instead use Celery with `django-celery-beat`:
 
 ```bash
 redis-server
-```
-
-> If you use Docker: `docker run -p 6379:6379 redis`
-
-### 2. Start a Celery worker
-
-From the project directory (with the venv activated):
-
-```bash
 celery -A forex_reminder worker -l info
-```
-
-### 3. Start the Celery beat scheduler
-
-Beat periodically triggers the `check_and_send_reminders` task. In development
-you can start it from the Django admin under **Periodic tasks**, or run:
-
-```bash
 celery -A forex_reminder beat -l info
 ```
 
-#### Creating a periodic schedule (optional)
-
-You can create the schedule programmatically:
+Then create the periodic schedule:
 
 ```bash
 python manage.py create_reminder_schedule
 ```
+
+> **Note:** `create_reminder_schedule` is **deprecated** and only useful if you
+> adopt Celery Beat. Do **not** run it alongside the cron on the same host, or
+> reminders would fire from both schedulers. If you do enable Beat later, update
+> that command's 09:00 UTC schedule to match `REMINDER_SEND_HOURS` and the local
+> timezone.
+
+### Configuring reminder days
 
 The default reminder day numbers are `[10, 15, 25, 26, 27, 28, 29, 30]`. To
 change them interactively:
@@ -192,11 +207,16 @@ sensible development defaults, so you only need to set what you actually use.
 | `EMAIL_HOST_USER`        | *(empty)*                       | SMTP username |
 | `EMAIL_HOST_PASSWORD`    | *(empty)*                       | SMTP password |
 | `EMAIL_USE_TLS`          | `True`                          | Use TLS for SMTP |
+| `REMINDER_SEND_HOURS`    | `[9, 14]`                       | Local hours (0-23) for the daily reminder slots |
 | `TWILIO_ACCOUNT_SID`     | *(empty)*                       | Twilio account SID (WhatsApp) |
 | `TWILIO_AUTH_TOKEN`      | *(empty)*                       | Twilio auth token |
 | `TWILIO_PHONE_NUMBER`    | *(empty)*                       | Twilio phone number |
 | `TWILIO_WHATSAPP_FROM`   | *(empty)*                       | Twilio WhatsApp-enabled sender (E.164) |
 | `TELEGRAM_BOT_TOKEN`     | *(empty)*                       | Telegram bot token |
+
+> ⚠️ **`DEBUG`** defaults to `True` for local convenience, but you **must set
+> `DEBUG=False` explicitly in production** (e.g. in your `.env`). Shipping with
+> `DEBUG=True` is a security risk.
 
 If the Twilio or Telegram credentials are missing, the corresponding
 notification functions simply log a warning and skip sending — development
@@ -210,12 +230,19 @@ The core task is `check_and_send_reminders` in `trades/tasks.py`. It:
 
 1. Reads the global `ReminderSchedule` to get the list of reminder day numbers.
 2. Loops over every trading account; for each, computes the days since the
-   last trade.
-3. If that day number is in the schedule, sends a reminder on every channel the
-   user has enabled (email, WhatsApp, Telegram).
-4. Writes a `ReminderHistory` row for each account+day+channel before sending,
-   and marks it `sent` afterward. The database's unique constraint guarantees
-   a reminder is never sent twice for the same account+day+channel.
+   last trade (in the account owner's local timezone).
+3. Only acts when the owner's local hour matches a configured slot in
+   `REMINDER_SEND_HOURS` (default `[9, 14]` = 9 AM and 2 PM local).
+4. On a scheduled day, sends a reminder on every channel the user has enabled
+   (email, WhatsApp, Telegram), recording each as `pending` first.
+5. Skips the later-in-day slot (e.g. the 2 PM one) if the user placed a trade
+   **after** the earlier slot that day (they already reacted to the 9 AM one).
+6. Writes a `ReminderHistory` row for each account+day+channel+slot before
+   sending, and marks it `sent` afterward. The database's unique constraint
+   guarantees a reminder is never sent twice for the same slot.
+
+The next reminder time (for the live countdown on the UI) is computed by
+`TradingAccount.next_reminder_datetime()`, which mirrors these same rules.
 
 ---
 
