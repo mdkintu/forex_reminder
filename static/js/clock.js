@@ -103,6 +103,47 @@
         }
     }
 
+    /**
+     * updateReminder — live countdown until the next reminder.
+     *
+     * Markup:
+     *   <span class="clock-reminder" data-reminder="2025-09-01T09:00:00+00:00">
+     *     …timed out…
+     *   </span>
+     *
+     * If data-reminder is empty/missing, show the placeholder (no upcoming).
+     */
+    function updateReminder(el) {
+        var raw = el.dataset.reminder;
+        if (!raw) {
+            el.textContent = "No upcoming reminder";
+            el.classList.add("reminder-none");
+            return;
+        }
+        var target = new Date(raw).getTime();
+        var diff = target - Date.now();
+
+        if (diff <= 0) {
+            el.textContent = "Reminder due";
+            el.classList.add("reminder-due");
+            return;
+        }
+
+        // d : hh : mm : ss
+        var days = Math.floor(diff / MS_PER_DAY);
+        var hours = Math.floor((diff % MS_PER_DAY) / MS_PER_HOUR);
+        var minutes = Math.floor((diff % MS_PER_HOUR) / MS_PER_MIN);
+        var seconds = Math.floor((diff % MS_PER_MIN) / 1000);
+
+        var parts = [];
+        if (days > 0) parts.push(days + "d");
+        parts.push(pad(hours) + "h");
+        parts.push(pad(minutes) + "m");
+        parts.push(pad(seconds) + "s");
+        el.textContent = parts.join(" ");
+        el.classList.remove("reminder-due", "reminder-none");
+    }
+
     function setText(root, role, text) {
         var el = root.querySelector('[data-role="' + role + '"]');
         if (el) el.textContent = text;
@@ -121,6 +162,13 @@
         badges.forEach(function (badge) {
             updateBadge(badge);
             setInterval(function () { updateBadge(badge); }, 1000);
+        });
+
+        // Reminder countdowns
+        var reminders = document.querySelectorAll(".clock-reminder[data-reminder]");
+        reminders.forEach(function (el) {
+            updateReminder(el);
+            setInterval(function () { updateReminder(el); }, 1000);
         });
     }
 

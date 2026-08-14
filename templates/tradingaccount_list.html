@@ -41,7 +41,10 @@
                         <span class="clock-badge" data-deadline="{{ account.deadline_iso }}"
                               data-label="days left">…</span>
                         <div class="small text-success mt-1">
-                            ⏰ {{ account.next_reminder_label }}
+                            ⏰ <span class="clock-reminder"
+                                     data-reminder="{{ account.next_reminder_iso }}">
+                                {{ account.next_reminder_label }}
+                            </span>
                         </div>
                     </td>
                     <td>

@@ -218,6 +218,16 @@ class TradingAccount(models.Model):
             return f"Tomorrow at {when}"
         return f"In {total_days} days at {when}"
 
+    def next_reminder_iso(self):
+        """ISO 8601 timestamp of the next reminder, or an empty string if none.
+
+        JS-friendly value for a live countdown (data-reminder attribute).
+        """
+        nxt = self.next_reminder_datetime()
+        if nxt is None:
+            return ""
+        return nxt.isoformat()
+
     @property
     def is_inactive(self):
         """True when the account has crossed the inactivity threshold."""

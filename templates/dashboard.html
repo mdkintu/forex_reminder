@@ -40,7 +40,11 @@
                                             Last trade: {{ account.last_trade_date|date:"M j, Y" }}
                                         </div>
                                         <div class="small text-success">
-                                            ⏰ Next reminder: {{ account.next_reminder_label }}
+                                            ⏰ Next reminder:
+                                            <span class="clock-reminder"
+                                                  data-reminder="{{ account.next_reminder_iso }}">
+                                                {{ account.next_reminder_label }}
+                                            </span>
                                         </div>
                                     </div>
                                     <span class="clock-badge"
