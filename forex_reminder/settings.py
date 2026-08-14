@@ -205,6 +205,13 @@ DATABASES = {
     }
 }
 
+# Turn on strict mode for MySQL/MariaDB so data-truncation and other integrity
+# problems raise errors instead of silently corrupting data.
+if config("DB_ENGINE", default="django.db.backends.sqlite3") == "django.db.backends.mysql":
+    DATABASES["default"]["OPTIONS"] = {
+        "init_command": "SET sql_mode='STRICT_TRANS_TABLES'"
+    }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
