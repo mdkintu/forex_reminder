@@ -27,7 +27,9 @@ class ReminderSchedule(models.Model):
     """
 
     #: Default day numbers used if no schedule row exists yet.
-    DEFAULT_DAYS = [10, 15, 25, 26, 27, 28, 29, 30]
+    # The last reminder is day 29: on day 30 the account may already have been
+    # closed (the deadline is exactly 30 days after the last trade).
+    DEFAULT_DAYS = [10, 15, 25, 26, 27, 28, 29]
 
     day_list = models.JSONField(
         default=list,
@@ -56,9 +58,13 @@ class ReminderSchedule(models.Model):
         return tuple(self.day_list or ReminderSchedule.DEFAULT_DAYS)
 
     def save(self, *args, **kwargs):
-        # Keep only the first row so the global schedule stays a singleton.
-        if self.pk is None and ReminderSchedule.objects.exists():
-            return
+        # Keep the global schedule a singleton: saving a new row updates the
+        # existing one instead of being silently ignored.
+        if self.pk is None:
+            existing = ReminderSchedule.objects.first()
+            if existing is not None:
+                self.pk = existing.pk
+                kwargs["force_insert"] = False
         super().save(*args, **kwargs)
 
 
@@ -171,6 +177,8 @@ class TradingAccount(models.Model):
                 prior = [h for h in send_hours if h < hour]
                 if prior and traded_after(max(prior)):
                     continue
+                if slot_dt >= self.deadline:
+                    continue
                 return slot_dt
             # All today's slots are past -> fall through to next schedule day.
 
@@ -178,7 +186,11 @@ class TradingAccount(models.Model):
         future = [d for d in schedule if d > days_since]
         if future:
             next_day = min(future)
-            return at_hour(today + timezone.timedelta(days=next_day - days_since), send_hours[0])
+            slot_dt = at_hour(
+                today + timezone.timedelta(days=next_day - days_since), send_hours[0]
+            )
+            if slot_dt < self.deadline:
+                return slot_dt
 
         # No next schedule day (e.g. past the last mark / inactive).
         return None
@@ -263,6 +275,8 @@ class ReminderHistory(models.Model):
     )
     sent_at = models.DateTimeField(auto_now_add=True)
     channel = models.CharField(max_length=20, choices=Channel.choices)
+    #: "pending" while sending, "sent" on success, "skipped" when the channel
+    #: isn't configured (no credentials / no phone / no chat id).
     status = models.CharField(max_length=20, default="sent")
     # The local hour (0-23) this reminder was intended for, so the two daily
     # delivery slots (e.g. 9 AM and 2 PM) are each recorded separately.

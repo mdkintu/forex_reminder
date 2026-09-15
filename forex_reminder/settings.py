@@ -6,7 +6,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
-from decouple import config
+from decouple import Csv, config
 
 # If using MySQL, make PyMySQL act as the MySQLdb driver that Django expects
 # (avoids needing the C-based mysqlclient library on shared hosting).
@@ -95,23 +95,6 @@ MIDDLEWARE = [
 ]
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 WSGI_APPLICATION = "forex_reminder.wsgi.application"
 
 # Custom user model (email as unique identifier)
@@ -126,25 +109,10 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 
-
 # Redirect destinations
 LOGIN_REDIRECT_URL = "/dashboard/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/"
 ACCOUNT_SIGNUP_REDIRECT_URL = "/dashboard/"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # Allauth: email-only login (django-allauth 65.x settings)
@@ -158,15 +126,6 @@ ACCOUNT_USER_MODEL_EMAIL_FIELD = "email"
 
 TEMPLATES = [
     {
-
-
-
-
-
-
-
-
-
 
 
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -184,7 +143,6 @@ TEMPLATES = [
 ]
 
 ROOT_URLCONF = "forex_reminder.urls"
-
 
 
 # Database
@@ -273,7 +231,11 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 # reminder is sent once per channel at each of these local hours (e.g. 9 AM
 # and 2 PM). The cron runs frequently; the task only acts when the user's
 # local hour matches a value here.
-REMINDER_SEND_HOURS = [9, 14]
+REMINDER_SEND_HOURS = config("REMINDER_SEND_HOURS", default="9,14", cast=Csv(int))
+
+# If the cron misses a slot's exact hour (server busy, cron delayed), the
+# reminder is still sent on a later run up to this many hours after the slot.
+REMINDER_GRACE_HOURS = config("REMINDER_GRACE_HOURS", default=3, cast=int)
 
 # Email (used by the reminder task). In development this defaults to the
 # console backend (prints emails to stdout). To send real email, set
@@ -289,7 +251,13 @@ EMAIL_HOST = config("EMAIL_HOST", default="localhost")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
-EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+# Port 587 uses STARTTLS (EMAIL_USE_TLS); port 465 uses implicit SSL
+# (EMAIL_USE_SSL). Django refuses both at once, so SSL switches TLS off.
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=not EMAIL_USE_SSL, cast=bool)
+if EMAIL_USE_SSL:
+    EMAIL_USE_TLS = False
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=30, cast=int)
 
 # Twilio (WhatsApp reminders)
 TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID", default="")

@@ -9,7 +9,7 @@ inactivity clause.
 
 It tracks the days since your last trade on each account and sends reminders
 **twice daily (9 AM and 2 PM, in the user's local timezone)** on a configurable
-schedule of day numbers (default: 10, 15, 25–30).
+schedule of day numbers (default: 10, 15, 25–29).
 
 Built with:
 
@@ -39,6 +39,9 @@ Built with:
 ## Features
 
 - Users sign in with **email + password** only (no username).
+- Each user's **timezone is auto-detected** from the browser on their first
+  dashboard visit. Changing the email on the profile page sends a
+  **confirmation link** to the new address.
 - Users can manage any number of **trading accounts** (create, view, edit, delete),
   including an **account number** for each.
 - Each account shows a **live inactivity countdown** to the 30-day deadline and a
@@ -150,8 +153,8 @@ the user's local hour, running it **hourly** is perfectly fine:
 0 * * * *  cd /path/to/project && /path/to/venv/bin/python manage.py send_reminders
 ```
 
-(The task only acts when the account owner's local hour matches a configured
-`REMINDER_SEND_HOURS` value — e.g. 9 and 14 — and deduplicates per slot, so an
+(The task sends each slot — e.g. 9 and 14 local — on the first run at or after
+that hour, within `REMINDER_GRACE_HOURS`, and deduplicates per slot, so an
 hourly cron catches both windows without double-sending.)
 
 ### Option B — Celery Beat (optional, needs Redis)
@@ -178,7 +181,10 @@ python manage.py create_reminder_schedule
 
 ### Configuring reminder days
 
-The default reminder day numbers are `[10, 15, 25, 26, 27, 28, 29, 30]`. To
+The default reminder day numbers are `[10, 15, 25, 26, 27, 28, 29]`. (No day-30
+reminder by default: the deadline is exactly 30 days after the last trade, so a
+day-30 reminder could arrive after the account is already closed. Reminders are
+never sent once the deadline has passed.) To
 change them interactively:
 
 ```bash
@@ -206,8 +212,11 @@ sensible development defaults, so you only need to set what you actually use.
 | `EMAIL_PORT`             | `587`                           | SMTP port |
 | `EMAIL_HOST_USER`        | *(empty)*                       | SMTP username |
 | `EMAIL_HOST_PASSWORD`    | *(empty)*                       | SMTP password |
-| `EMAIL_USE_TLS`          | `True`                          | Use TLS for SMTP |
-| `REMINDER_SEND_HOURS`    | `[9, 14]`                       | Local hours (0-23) for the daily reminder slots |
+| `EMAIL_USE_TLS`          | `True` (unless SSL is on)       | STARTTLS for SMTP (port 587) |
+| `EMAIL_USE_SSL`          | `False`                         | Implicit SSL for SMTP (port 465); turns TLS off |
+| `EMAIL_TIMEOUT`          | `30`                            | SMTP timeout in seconds |
+| `REMINDER_SEND_HOURS`    | `9,14`                          | Comma-separated local hours (0-23) for the daily reminder slots |
+| `REMINDER_GRACE_HOURS`   | `3`                             | A missed slot is still sent on a cron run up to this many hours late |
 | `TWILIO_ACCOUNT_SID`     | *(empty)*                       | Twilio account SID (WhatsApp) |
 | `TWILIO_AUTH_TOKEN`      | *(empty)*                       | Twilio auth token |
 | `TWILIO_PHONE_NUMBER`    | *(empty)*                       | Twilio phone number |
@@ -231,10 +240,14 @@ The core task is `check_and_send_reminders` in `trades/tasks.py`. It:
 1. Reads the global `ReminderSchedule` to get the list of reminder day numbers.
 2. Loops over every trading account; for each, computes the days since the
    last trade (in the account owner's local timezone).
-3. Only acts when the owner's local hour matches a configured slot in
-   `REMINDER_SEND_HOURS` (default `[9, 14]` = 9 AM and 2 PM local).
+3. Only acts when a slot in `REMINDER_SEND_HOURS` (default 9 AM and 2 PM
+   local) is due: the latest slot at or before the owner's local hour, up to
+   `REMINDER_GRACE_HOURS` late (so a delayed cron run still delivers it).
+   Accounts already past their 30-day deadline are skipped.
 4. On a scheduled day, sends a reminder on every channel the user has enabled
-   (email, WhatsApp, Telegram), recording each as `pending` first.
+   (email, WhatsApp, Telegram), recording each as `pending` first. A channel
+   with no credentials or no recipient (phone / chat id) is recorded as
+   `skipped`, not `sent`.
 5. Skips the later-in-day slot (e.g. the 2 PM one) if the user placed a trade
    **after** the earlier slot that day (they already reacted to the 9 AM one).
 6. Writes a `ReminderHistory` row for each account+day+channel+slot before

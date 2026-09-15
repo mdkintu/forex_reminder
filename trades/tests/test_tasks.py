@@ -283,3 +283,82 @@ def test_task_skips_later_slot_when_traded_after_morning(
     assert sent == 0
     assert ReminderHistory.objects.count() == 0
     mock_notifiers["send_mail"].assert_not_called()
+
+
+@pytest.mark.django_db
+def test_task_catches_up_missed_slot(user, schedule, mock_notifiers, settings):
+    """A slot missed by the cron is still sent on a later run within the grace window."""
+    current_hour = timezone.localtime(timezone.now()).hour
+    if current_hour == 0:
+        pytest.skip("needs an earlier hour today")
+    settings.REMINDER_SEND_HOURS = [current_hour - 1]
+    settings.REMINDER_GRACE_HOURS = 3
+    TradingAccount.objects.create(
+        user=user,
+        account_name="Late cron",
+        last_trade_date=timezone.now() - timedelta(days=10),
+        notify_email=True,
+    )
+
+    assert tasks.check_and_send_reminders() == 1
+    assert ReminderHistory.objects.get().slot_hour == current_hour - 1
+
+
+@pytest.mark.django_db
+def test_task_does_not_send_after_grace_window(user, schedule, mock_notifiers, settings):
+    """A slot older than the grace window is not sent."""
+    current_hour = timezone.localtime(timezone.now()).hour
+    if current_hour < 5:
+        pytest.skip("needs a slot more than 3 hours earlier today")
+    settings.REMINDER_SEND_HOURS = [current_hour - 5]
+    settings.REMINDER_GRACE_HOURS = 3
+    TradingAccount.objects.create(
+        user=user,
+        account_name="Too late",
+        last_trade_date=timezone.now() - timedelta(days=10),
+        notify_email=True,
+    )
+
+    assert tasks.check_and_send_reminders() == 0
+
+
+@pytest.mark.django_db
+def test_task_marks_unconfigured_channel_skipped(user, schedule, mock_notifiers):
+    """A channel whose helper sends nothing is recorded as 'skipped', not 'sent'."""
+    mock_notifiers["send_telegram"].return_value = None
+    TradingAccount.objects.create(
+        user=user,
+        account_name="No telegram",
+        last_trade_date=timezone.now() - timedelta(days=10),
+        notify_email=True,
+        notify_telegram=True,
+    )
+
+    assert tasks.check_and_send_reminders() == 1
+    statuses = dict(ReminderHistory.objects.values_list("channel", "status"))
+    assert statuses == {"email": "sent", "telegram": "skipped"}
+
+
+@pytest.mark.django_db
+def test_task_skips_accounts_past_deadline(user, mock_notifiers):
+    """No reminder once the 30-day deadline has passed, even on a schedule day."""
+    ReminderSchedule.objects.create(day_list=[30])
+    TradingAccount.objects.create(
+        user=user,
+        account_name="Closed",
+        last_trade_date=timezone.now() - timedelta(days=30, minutes=1),
+        notify_email=True,
+    )
+
+    assert tasks.check_and_send_reminders() == 0
+    assert ReminderHistory.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_schedule_save_updates_existing_row():
+    """Saving a new ReminderSchedule updates the singleton instead of doing nothing."""
+    ReminderSchedule.objects.create(day_list=[10])
+    ReminderSchedule(day_list=[5, 6]).save()
+
+    assert ReminderSchedule.objects.count() == 1
+    assert ReminderSchedule.get().days() == (5, 6)

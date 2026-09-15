@@ -117,3 +117,42 @@ def test_dashboard_shows_empty_state_when_no_accounts(authenticated_client):
     assert response.status_code == 200
     assert not response.context["accounts"]
     assert "haven't added any trading accounts yet" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_dashboard_saves_detected_timezone_over_utc_default(authenticated_client, user):
+    """A new user on the 'UTC' default gets the browser timezone saved."""
+    assert user.timezone == "UTC"
+    authenticated_client.get(reverse("accounts:dashboard") + "?tz=Africa/Kampala")
+    user.refresh_from_db()
+    assert user.timezone == "Africa/Kampala"
+
+
+@pytest.mark.django_db
+def test_dashboard_does_not_overwrite_detected_timezone(authenticated_client, user):
+    """Once a real timezone is saved, later detections don't change it."""
+    user.timezone = "Africa/Kampala"
+    user.save()
+    authenticated_client.get(reverse("accounts:dashboard") + "?tz=Europe/London")
+    user.refresh_from_db()
+    assert user.timezone == "Africa/Kampala"
+
+
+@pytest.mark.django_db
+def test_profile_email_change_requires_verification(authenticated_client, user, mailoutbox):
+    """Changing email leaves the new address unverified and sends a confirmation."""
+    from allauth.account.models import EmailAddress
+
+    EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+    authenticated_client.post(
+        reverse("accounts:profile"),
+        {"email": "new@example.com", "first_name": "", "last_name": "",
+         "phone_number": "", "telegram_chat_id": ""},
+    )
+    user.refresh_from_db()
+    assert user.email == "new@example.com"
+    address = EmailAddress.objects.get(user=user)
+    assert address.email == "new@example.com"
+    assert address.primary is True
+    assert address.verified is False
+    assert any("new@example.com" in m.to for m in mailoutbox)

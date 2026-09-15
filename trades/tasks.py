@@ -33,7 +33,7 @@ def _recipient_name(account):
 # ============================================================================
 
 
-def _send_email(account, day_number) -> None:
+def _send_email(account, day_number):
     """Send the inactivity reminder via email.
 
     Uses settings.EMAIL_BACKEND (console for dev, SMTP for production).
@@ -50,10 +50,10 @@ def _send_email(account, day_number) -> None:
         f"Please place a trade to keep the account active, or contact your broker.\n\n"
         f"— Forex Account Inactivity Reminder (FAIR)"
     )
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [account.user.email])
+    return send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [account.user.email])
 
 
-def _send_whatsapp(account, day_number) -> None:
+def _send_whatsapp(account, day_number):
     """Send the inactivity reminder via WhatsApp to the user's phone number."""
     name = _recipient_name(account)
     body = (
@@ -62,10 +62,10 @@ def _send_whatsapp(account, day_number) -> None:
         f"broker: {account.broker or 'unknown'}) has had no trade for "
         f"{day_number} days. Please place a trade to keep it active."
     )
-    send_whatsapp_message(account.user.phone_number, body)
+    return send_whatsapp_message(account.user.phone_number, body)
 
 
-def _send_telegram(account, day_number) -> None:
+def _send_telegram(account, day_number):
     """Send the inactivity reminder via Telegram to the user's chat id."""
     name = _recipient_name(account)
     text = (
@@ -74,7 +74,7 @@ def _send_telegram(account, day_number) -> None:
         f"broker: {account.broker or 'unknown'}) has had no trade for "
         f"{day_number} days. Please place a trade to keep it active."
     )
-    send_telegram_message(account.user.telegram_chat_id, text)
+    return send_telegram_message(account.user.telegram_chat_id, text)
 
 
 SENDERS = {
@@ -90,6 +90,22 @@ def _channel_is_enabled(account, channel) -> bool:
         ReminderHistory.Channel.WHATSAPP: account.notify_whatsapp,
         ReminderHistory.Channel.TELEGRAM: account.notify_telegram,
     }[channel]
+
+
+def _due_slot_hour(local_now, send_hours, grace_hours):
+    """The delivery slot (local hour) that is due right now, or None.
+
+    The most recent slot at or before the current local hour is due as long
+    as we are still within ``grace_hours`` of it. This lets a delayed or
+    missed cron run catch up instead of losing the reminder.
+    """
+    passed = [h for h in sorted(set(send_hours or [])) if h <= local_now.hour]
+    if not passed:
+        return None
+    slot = max(passed)
+    if local_now.hour - slot > max(0, grace_hours):
+        return None
+    return slot
 
 
 def _traded_since_last_slot(account, local_hour, send_hours) -> bool:
@@ -143,6 +159,7 @@ def check_and_send_reminders() -> int:
     sent_count = 0
     reminder_days = ReminderSchedule.get().days()
     send_hours = getattr(settings, "REMINDER_SEND_HOURS", [9, 14])
+    grace_hours = getattr(settings, "REMINDER_GRACE_HOURS", 3)
 
     for account in TradingAccount.objects.select_related("user").all():
         # Days since last trade in the account owner's local timezone.
@@ -151,11 +168,15 @@ def check_and_send_reminders() -> int:
         if days_since not in reminder_days:
             continue
 
-        # The account owner's current local wall-clock hour (0-23).
-        local_hour = timezone.localtime(timezone.now(), account.user.get_timezone()).hour
+        # Never remind about an account that has already passed its deadline.
+        if timezone.now() >= account.deadline:
+            continue
 
-        # Only act when we're inside one of the configured delivery windows.
-        if local_hour not in send_hours:
+        # The delivery slot that is due now in the owner's local time (the
+        # latest slot at or before the current hour, within the grace window).
+        local_now = timezone.localtime(timezone.now(), account.user.get_timezone())
+        local_hour = _due_slot_hour(local_now, send_hours, grace_hours)
+        if local_hour is None:
             continue
 
         # Skip later-in-the-day slots if the user already traded after the
@@ -186,7 +207,21 @@ def check_and_send_reminders() -> int:
                         status="pending",
                         slot_hour=local_hour,
                     )
-                    SENDERS[channel](account, days_since)
+                    result = SENDERS[channel](account, days_since)
+
+                    if not result:
+                        # Channel not configured / no recipient: record it as
+                        # skipped (so we don't retry every hour) but don't
+                        # pretend it was delivered.
+                        history.status = "skipped"
+                        history.save(update_fields=["status"])
+                        logger.warning(
+                            "[reminder] Skipped '%s' reminder for account '%s' "
+                            "(channel not configured or no recipient).",
+                            channel,
+                            account.account_name,
+                        )
+                        continue
 
                     history.status = "sent"
                     history.save(update_fields=["status"])

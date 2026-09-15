@@ -40,6 +40,8 @@ EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=mail.fair.tergym.com
 EMAIL_PORT=465
 EMAIL_USE_SSL=True
+# (EMAIL_USE_SSL=True switches EMAIL_USE_TLS off automatically. If your host
+#  uses port 587 instead, set EMAIL_PORT=587, EMAIL_USE_SSL=False, EMAIL_USE_TLS=True.)
 EMAIL_HOST_USER=no-reply@fair.tergym.com
 EMAIL_HOST_PASSWORD=your-email-password
 DEFAULT_FROM_EMAIL=no-reply@fair.tergym.com
@@ -51,6 +53,10 @@ TWILIO_WHATSAPP_FROM=
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+
+# --- Reminders ---
+REMINDER_SEND_HOURS=9,14
+REMINDER_GRACE_HOURS=3
 
 # --- Misc ---
 TIME_ZONE=UTC

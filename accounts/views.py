@@ -41,9 +41,11 @@ def _save_detected_timezone(request) -> None:
     if not tz:
         return
     user = request.user
-    if user.is_authenticated and not user.timezone:
+    # New users start on the "UTC" default, so treat that as "not detected yet".
+    if user.is_authenticated and user.timezone in ("", "UTC"):
+        before = user.timezone
         user.set_timezone_from_js(tz)
-        if user.timezone:
+        if user.timezone and user.timezone != before:
             user.save(update_fields=["timezone"])
 
 
@@ -56,15 +58,29 @@ def profile(request):
     two stay in sync.
     """
     if request.method == "POST":
+        # Read the current email before binding: form validation writes the
+        # submitted values onto request.user.
+        old_email = request.user.email
         form = ProfileForm(request.POST, instance=request.user)
         if form.is_valid():
-            old_email = request.user.email
             user = form.save()
 
-            # Keep allauth's email records in sync when the address changes.
-            if user.email != old_email:
-                EmailAddress.objects.filter(user=user).update(
-                    email=user.email, verified=True, primary=True
+            # When the address changes, the new one must be verified: replace
+            # allauth's records with an unverified address and send a
+            # confirmation link to it.
+            if user.email.lower() != old_email.lower():
+                new_email = user.email
+                EmailAddress.objects.filter(user=user).exclude(
+                    email__iexact=new_email
+                ).delete()
+                address = EmailAddress.objects.add_email(
+                    request, user, new_email, confirm=True
+                )
+                address.set_as_primary()
+                messages.info(
+                    request,
+                    f"We sent a confirmation link to {new_email}. "
+                    "Please verify your new email address.",
                 )
 
             messages.success(request, "Your profile was updated.")

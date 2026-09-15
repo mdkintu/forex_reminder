@@ -133,10 +133,12 @@ def send_telegram_message(chat_id: str | int, text: str) -> object | None:
         )
         return result
     except RuntimeError:
-        # A loop may already be running in this thread/context; fall back to
-        # reusing it.
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(_send())
+        # asyncio.run() refuses to start inside an already-running loop; run
+        # the send on a fresh loop in a worker thread instead.
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            result = pool.submit(asyncio.run, _send()).result()
         logger.info(
             "[notifications][telegram] Sent to chat %s (msg id %s).",
             chat_id,
