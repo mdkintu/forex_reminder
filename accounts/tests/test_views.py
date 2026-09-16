@@ -67,14 +67,12 @@ def test_profile_form_updates_user(authenticated_client, user):
             "first_name": "Jane",
             "last_name": "Smith",
             "phone_number": "+441234567890",
-            "telegram_chat_id": "111222333",
         },
     )
     assert response.status_code == 302  # redirect after success
     user.refresh_from_db()
     assert user.last_name == "Smith"
     assert user.phone_number == "+441234567890"
-    assert user.telegram_chat_id == "111222333"
 
 
 @pytest.mark.django_db
@@ -147,7 +145,7 @@ def test_profile_email_change_requires_verification(authenticated_client, user, 
     authenticated_client.post(
         reverse("accounts:profile"),
         {"email": "new@example.com", "first_name": "", "last_name": "",
-         "phone_number": "", "telegram_chat_id": ""},
+         "phone_number": ""},
     )
     user.refresh_from_db()
     assert user.email == "new@example.com"
@@ -156,3 +154,53 @@ def test_profile_email_change_requires_verification(authenticated_client, user, 
     assert address.primary is True
     assert address.verified is False
     assert any("new@example.com" in m.to for m in mailoutbox)
+
+
+# ---------------------------------------------------------------------------
+# Connect Telegram (profile page)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_profile_shows_connect_telegram_link_when_not_connected(
+    authenticated_client, user, settings
+):
+    settings.TELEGRAM_BOT_USERNAME = "FAIR_Alertss_bot"
+    user.telegram_chat_id = ""  # the shared `user` fixture defaults this set
+    user.save()
+    response = authenticated_client.get(reverse("accounts:profile"))
+    assert response.status_code == 200
+    assert response.context["telegram_connect_url"] is not None
+    assert "t.me/FAIR_Alertss_bot?start=" in response.context["telegram_connect_url"]
+    assert "Connect Telegram" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_profile_hides_connect_link_without_bot_username_configured(
+    authenticated_client, settings
+):
+    settings.TELEGRAM_BOT_USERNAME = ""
+    response = authenticated_client.get(reverse("accounts:profile"))
+    assert response.context["telegram_connect_url"] is None
+
+
+@pytest.mark.django_db
+def test_profile_shows_connected_state(authenticated_client, user, settings):
+    settings.TELEGRAM_BOT_USERNAME = "FAIR_Alertss_bot"
+    user.telegram_chat_id = "123456"
+    user.save()
+    response = authenticated_client.get(reverse("accounts:profile"))
+    assert "Telegram connected" in response.content.decode()
+    assert response.context["telegram_connect_url"] is None
+
+
+@pytest.mark.django_db
+def test_disconnect_telegram_clears_chat_id(authenticated_client, user):
+    user.telegram_chat_id = "123456"
+    user.save()
+    response = authenticated_client.post(
+        reverse("accounts:profile"), {"disconnect_telegram": "1"}
+    )
+    assert response.status_code == 302
+    user.refresh_from_db()
+    assert user.telegram_chat_id == ""

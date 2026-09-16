@@ -9,7 +9,7 @@
             <h1 class="h4 card-title mb-1">My Profile</h1>
             <p class="text-secondary mb-4">
                 Update your contact details. These are used for reminders:
-                phone (WhatsApp), Telegram chat ID, and email.
+                phone (WhatsApp), Telegram, and email.
             </p>
 
             <form method="post" novalidate>
@@ -45,6 +45,30 @@
                     </a>
                 </div>
             </form>
+
+            <hr class="my-4">
+
+            <h2 class="h6 fw-semibold mb-2">Telegram reminders</h2>
+            {% if user.telegram_chat_id %}
+                <p class="text-success mb-2">✅ Telegram connected.</p>
+                <form method="post" class="mb-0">
+                    {% csrf_token %}
+                    <button type="submit" name="disconnect_telegram" value="1"
+                            class="btn btn-outline-danger btn-sm">
+                        Disconnect Telegram
+                    </button>
+                </form>
+            {% elif telegram_connect_url %}
+                <p class="text-secondary small mb-2">
+                    One tap connects this account to our Telegram bot — no chat ID to look up or type.
+                </p>
+                <a href="{{ telegram_connect_url }}" target="_blank" rel="noopener"
+                   class="btn btn-primary btn-sm">
+                    Connect Telegram
+                </a>
+            {% else %}
+                <p class="text-secondary small mb-0">Telegram reminders aren't configured on this server.</p>
+            {% endif %}
 
             <hr class="my-4">
 

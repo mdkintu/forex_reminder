@@ -79,7 +79,7 @@
                     <h5 class="card-title text-primary">Notification preferences</h5>
                     <p class="text-secondary">
                         Phone: {{ user.phone_number|default:"Not set" }}<br>
-                        Telegram chat ID: {{ user.telegram_chat_id|default:"Not set" }}
+                        Telegram: {% if user.telegram_chat_id %}✅ Connected{% else %}Not connected{% endif %}
                     </p>
                     <a href="{% url 'accounts:profile' %}" class="btn btn-outline-primary btn-sm">
                         Edit profile

@@ -59,6 +59,14 @@ TWILIO_WHATSAPP_FROM=
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+# Public @username of the bot (no leading @) -- powers the one-tap "Connect
+# Telegram" button on the profile page.
+TELEGRAM_BOT_USERNAME=your_bot_username
+# Random secret used to verify incoming Telegram webhook calls. Generate:
+#   python -c "import secrets; print(secrets.token_urlsafe(32))"
+# After setting this (and deploying), register the webhook once:
+#   python manage.py set_telegram_webhook
+TELEGRAM_WEBHOOK_SECRET=a-long-random-string
 
 # --- Reminders ---
 REMINDER_SEND_HOURS=9,14

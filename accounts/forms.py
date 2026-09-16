@@ -8,12 +8,14 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = User
+        # telegram_chat_id is deliberately not here: it's set via the
+        # "Connect Telegram" deep-link flow (accounts.views.telegram_webhook),
+        # not typed in by hand — see templates/account/profile.html.
         fields = [
             "email",
             "first_name",
             "last_name",
             "phone_number",
-            "telegram_chat_id",
         ]
         widgets = {
             "email": forms.EmailInput(
@@ -29,12 +31,6 @@ class ProfileForm(forms.ModelForm):
                 attrs={
                     "class": "form-control",
                     "placeholder": "+15551234567 (E.164, used for WhatsApp)",
-                }
-            ),
-            "telegram_chat_id": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Your Telegram chat id, e.g. 123456789",
                 }
             ),
         }

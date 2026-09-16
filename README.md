@@ -203,6 +203,9 @@ sensible development defaults, so you only need to set what you actually use.
 | `SECRET_KEY`             | dev-only placeholder            | Django secret key (set a real one in production) |
 | `DEBUG`                  | `True`                          | Django debug mode |
 | `ALLOWED_HOSTS`          | `localhost,127.0.0.1`           | Comma-separated allowed hosts |
+| `SITE_NAME`              | `FAIR`                          | Shown in confirmation/verification emails and SEO tags |
+| `SITE_DOMAIN`            | `127.0.0.1:8000`                | Your real domain in production, e.g. `fair.tergym.com` |
+| `SITE_SCHEME`            | `http` (`https` when `DEBUG=False`) | Must be `https` in production — required for the Telegram webhook |
 | `DB_NAME`                | `db.sqlite3`                    | SQLite database file |
 | `TIME_ZONE`              | `UTC`                           | Application time zone |
 | `REDIS_URL`              | `redis://localhost:6379/0`      | Celery broker/result backend |
@@ -222,6 +225,8 @@ sensible development defaults, so you only need to set what you actually use.
 | `TWILIO_PHONE_NUMBER`    | *(empty)*                       | Twilio phone number |
 | `TWILIO_WHATSAPP_FROM`   | *(empty)*                       | Twilio WhatsApp-enabled sender (E.164) |
 | `TELEGRAM_BOT_TOKEN`     | *(empty)*                       | Telegram bot token |
+| `TELEGRAM_BOT_USERNAME`  | *(empty)*                       | Bot's public @username (no `@`) — powers the "Connect Telegram" deep link |
+| `TELEGRAM_WEBHOOK_SECRET`| *(empty)*                       | Random secret verifying incoming Telegram webhook calls |
 
 > ⚠️ **`DEBUG`** defaults to `True` for local convenience, but you **must set
 > `DEBUG=False` explicitly in production** (e.g. in your `.env`). Shipping with
@@ -230,6 +235,36 @@ sensible development defaults, so you only need to set what you actually use.
 If the Twilio or Telegram credentials are missing, the corresponding
 notification functions simply log a warning and skip sending — development
 never crashes.
+
+### Connecting Telegram
+
+Telegram bots can't message a user who has never contacted them first — that's
+a platform-level anti-spam rule, not something this app controls. To make that
+as close to frictionless as possible, the profile page offers a one-tap
+"Connect Telegram" button instead of asking users to find and type a numeric
+chat ID:
+
+1. The user taps **Connect Telegram**, which opens
+   `t.me/<TELEGRAM_BOT_USERNAME>?start=<token>` in Telegram with a
+   per-user, 30-minute token.
+2. They tap Telegram's own **Start** button — that's the one unavoidable
+   message-to-the-bot Telegram requires.
+3. Telegram calls this app's webhook (`accounts.views.telegram_webhook`) with
+   that `/start <token>` message; the webhook resolves the token back to the
+   user, saves the resulting chat id, and replies with a confirmation.
+
+This needs a one-time setup step in production (HTTPS only — Telegram refuses
+plain HTTP webhooks):
+
+```bash
+# TELEGRAM_WEBHOOK_SECRET must be set in .env first, and SITE_SCHEME=https.
+python manage.py set_telegram_webhook          # register it
+python manage.py set_telegram_webhook --info   # check what's currently registered
+python manage.py set_telegram_webhook --delete # unregister it
+```
+
+Re-run `set_telegram_webhook` any time `SITE_DOMAIN`, `TELEGRAM_BOT_TOKEN`, or
+`TELEGRAM_WEBHOOK_SECRET` change.
 
 ---
 

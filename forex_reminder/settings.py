@@ -279,3 +279,13 @@ TWILIO_WHATSAPP_FROM = config("TWILIO_WHATSAPP_FROM", default="")
 
 # Telegram
 TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default="")
+# Public @username of the bot (no leading @), used to build the one-tap
+# "Connect Telegram" deep link (t.me/<username>?start=<token>) on the
+# profile page. Set to your bot's actual username.
+TELEGRAM_BOT_USERNAME = config("TELEGRAM_BOT_USERNAME", default="")
+# Shared secret Telegram echoes back in the X-Telegram-Bot-Api-Secret-Token
+# header on every webhook call, so accounts.views.telegram_webhook can tell
+# a genuine Telegram request from a spoofed POST to the same URL. Set via
+# `set_telegram_webhook` (see that management command), which registers this
+# same value with Telegram's servers.
+TELEGRAM_WEBHOOK_SECRET = config("TELEGRAM_WEBHOOK_SECRET", default="")

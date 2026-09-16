@@ -1,5 +1,8 @@
+import secrets
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone as dj_timezone
 
 
 class UserManager(BaseUserManager):
@@ -41,9 +44,19 @@ class User(AbstractUser):
 
     username = None  # Remove the username field entirely
 
+    #: How long a generated "Connect Telegram" link token stays valid.
+    TELEGRAM_LINK_TOKEN_VALID_MINUTES = 30
+
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=20, blank=True)
     telegram_chat_id = models.CharField(max_length=100, blank=True)
+    # Short-lived token for the "Connect Telegram" deep link
+    # (t.me/<bot>?start=<token>). Telegram requires the user to message the
+    # bot before it can message them — this one-tap flow does that message
+    # for them, and accounts.views.telegram_webhook uses this token to know
+    # which account the resulting chat_id belongs to. Cleared after use.
+    telegram_link_token = models.CharField(max_length=43, blank=True, db_index=True)
+    telegram_link_token_created_at = models.DateTimeField(null=True, blank=True)
     # IANA timezone name (e.g. "Africa/Nairobi", "America/New_York"). Auto
     # detected from the user's browser on first login, with a manual override.
     # Used to compute "days since last trade" in the user's local timezone so
@@ -79,3 +92,35 @@ class User(AbstractUser):
                 self.timezone = value
         except (zoneinfo.ZoneInfoNotFoundError, ValueError, TypeError):
             pass  # ignore junk from the client
+
+    def get_or_create_telegram_link_token(self) -> str:
+        """A valid token for the "Connect Telegram" deep link, generating a
+        fresh one if there's none yet or the existing one has expired."""
+        if self.telegram_link_token and self._telegram_link_token_is_valid():
+            return self.telegram_link_token
+        self.telegram_link_token = secrets.token_urlsafe(32)
+        self.telegram_link_token_created_at = dj_timezone.now()
+        self.save(update_fields=["telegram_link_token", "telegram_link_token_created_at"])
+        return self.telegram_link_token
+
+    def _telegram_link_token_is_valid(self) -> bool:
+        if not self.telegram_link_token or not self.telegram_link_token_created_at:
+            return False
+        age = dj_timezone.now() - self.telegram_link_token_created_at
+        return age.total_seconds() <= self.TELEGRAM_LINK_TOKEN_VALID_MINUTES * 60
+
+    def clear_telegram_link_token(self) -> None:
+        self.telegram_link_token = ""
+        self.telegram_link_token_created_at = None
+        self.save(update_fields=["telegram_link_token", "telegram_link_token_created_at"])
+
+    @classmethod
+    def resolve_telegram_link_token(cls, token: str) -> "User | None":
+        """The user a still-valid "Connect Telegram" token belongs to, or
+        None if the token is missing, unknown, or expired."""
+        if not token:
+            return None
+        user = cls.objects.filter(telegram_link_token=token).first()
+        if user is None or not user._telegram_link_token_is_valid():
+            return None
+        return user
