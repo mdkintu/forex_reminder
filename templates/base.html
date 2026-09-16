@@ -4,6 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- {# Sets data-bs-theme on <html> before first paint, so there's no flash
+       of the wrong theme. Must stay first, unblocked by defer/async, and
+       before the CSS below. See static/js/theme.js. #} -->
+    <script src="{% static 'js/theme.js' %}"></script>
     <title>{% block title %}Forex Account Inactivity Reminder (FAIR){% endblock %}</title>
 
     {% block meta_description %}
@@ -78,6 +82,18 @@
                             <a class="btn btn-primary btn-sm" href="{% url 'account_signup' %}">Sign Up</a>
                         </li>
                     {% endif %}
+                    <li class="nav-item dropdown ms-lg-2">
+                        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button"
+                                id="themeMenuButton" data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="Choose theme">
+                            <span id="themeIcon" aria-hidden="true">🖥️</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="themeMenuButton">
+                            <li><button class="dropdown-item" type="button" data-theme-choice="light">☀️ Light</button></li>
+                            <li><button class="dropdown-item" type="button" data-theme-choice="dark">🌙 Dark</button></li>
+                            <li><button class="dropdown-item" type="button" data-theme-choice="auto">🖥️ System</button></li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -118,10 +134,10 @@
     <script src="{% static 'js/clock.js' %}"></script>
 
     {% if user.is_authenticated %}
-    {# Auto-detect the user's timezone (once) so "days since trade" is computed
+    <!-- {# Auto-detect the user's timezone (once) so "days since trade" is computed
        in their local calendar day, not UTC. See static/js/tz-detect.js —
        kept out of an inline <script> so the CSP script-src doesn't need
-       'unsafe-inline'. #}
+       'unsafe-inline'. #} -->
     <script src="{% static 'js/tz-detect.js' %}" defer></script>
     {% endif %}
 
