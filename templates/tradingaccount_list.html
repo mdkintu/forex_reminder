@@ -50,9 +50,8 @@
                     <td>
                         <span class="small text-secondary">
                             {% if account.notify_email %}📧{% endif %}
-                            {% if account.notify_whatsapp %}💬{% endif %}
                             {% if account.notify_telegram %}✈️{% endif %}
-                            {% if not account.notify_email and not account.notify_whatsapp and not account.notify_telegram %}
+                            {% if not account.notify_email and not account.notify_telegram %}
                                 Off
                             {% endif %}
                         </span>

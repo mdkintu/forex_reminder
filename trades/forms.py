@@ -15,13 +15,15 @@ class TradingAccountForm(forms.ModelForm):
 
     class Meta:
         model = TradingAccount
+        # notify_whatsapp is deliberately not here: WhatsApp reminders aren't
+        # wired up to a real provider yet, so the toggle is hidden rather
+        # than offered as if it worked. See trades/models.py.
         fields = [
             "account_name",
             "account_number",
             "broker",
             "last_trade_date",
             "notify_email",
-            "notify_whatsapp",
             "notify_telegram",
         ]
         widgets = {

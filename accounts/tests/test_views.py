@@ -66,13 +66,11 @@ def test_profile_form_updates_user(authenticated_client, user):
             "email": user.email,
             "first_name": "Jane",
             "last_name": "Smith",
-            "phone_number": "+441234567890",
         },
     )
     assert response.status_code == 302  # redirect after success
     user.refresh_from_db()
     assert user.last_name == "Smith"
-    assert user.phone_number == "+441234567890"
 
 
 @pytest.mark.django_db
@@ -144,8 +142,7 @@ def test_profile_email_change_requires_verification(authenticated_client, user, 
     EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
     authenticated_client.post(
         reverse("accounts:profile"),
-        {"email": "new@example.com", "first_name": "", "last_name": "",
-         "phone_number": ""},
+        {"email": "new@example.com", "first_name": "", "last_name": ""},
     )
     user.refresh_from_db()
     assert user.email == "new@example.com"

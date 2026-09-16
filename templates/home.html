@@ -4,7 +4,7 @@
 {% block title %}Never Lose Your Forex Account to Inactivity{% endblock %}
 
 {% block meta_description %}
-<meta name="description" content="Most prop firms close accounts after ~30 days without a trade. FAIR watches the clock for every funded account you add and reminds you by email, WhatsApp or Telegram before it's too late.">
+<meta name="description" content="Most prop firms close accounts after ~30 days without a trade. FAIR watches the clock for every funded account you add and reminds you by email or Telegram before it's too late.">
 {% endblock %}
 
 {% block og_tags %}
@@ -51,8 +51,7 @@
                     Built for <strong>prop-firm traders</strong>. Most firms close
                     accounts that go 30 days without a trade — and too many funded
                     traders lose their accounts this way. We watch the clock for
-                    you and remind you before it's too late — by email, WhatsApp,
-                    or Telegram.
+                    you and remind you before it's too late — by email or Telegram.
                 </p>
                 <div class="d-flex gap-3 flex-wrap">
                     {% if user.is_authenticated %}
@@ -80,7 +79,7 @@
         <h2 class="text-center mb-5">Everything you need to stay active</h2>
         <div class="row g-4">
 
-            <div class="col-md-6 col-lg-3">
+            <div class="col-md-6 col-lg-4">
                 <div class="card h-100 border-0 shadow-sm text-center p-3">
                     <div class="feature-icon bg-primary-subtle text-primary mx-auto mb-3">⏳</div>
                     <h5 class="fw-semibold">Countdown Clock</h5>
@@ -91,7 +90,7 @@
                 </div>
             </div>
 
-            <div class="col-md-6 col-lg-3">
+            <div class="col-md-6 col-lg-4">
                 <div class="card h-100 border-0 shadow-sm text-center p-3">
                     <div class="feature-icon bg-success-subtle text-success mx-auto mb-3">✉️</div>
                     <h5 class="fw-semibold">Email Reminders</h5>
@@ -102,18 +101,7 @@
                 </div>
             </div>
 
-            <div class="col-md-6 col-lg-3">
-                <div class="card h-100 border-0 shadow-sm text-center p-3">
-                    <div class="feature-icon bg-success-subtle text-success mx-auto mb-3">💬</div>
-                    <h5 class="fw-semibold">WhatsApp Alerts</h5>
-                    <p class="text-secondary mb-0 small">
-                        Get notified straight to your phone via WhatsApp for
-                        real-time, on-the-go peace of mind.
-                    </p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
+            <div class="col-md-6 col-lg-4">
                 <div class="card h-100 border-0 shadow-sm text-center p-3">
                     <div class="feature-icon bg-info-subtle text-info mx-auto mb-3">📨</div>
                     <h5 class="fw-semibold">Telegram Bot</h5>
@@ -286,7 +274,7 @@
                         2 PM your local time). On the day marks you've chosen (for
                         example, 10, 15, 25, and 30 days since your last trade) we
                         send a reminder through whichever channels you've enabled —
-                        email, WhatsApp, or Telegram.
+                        email or Telegram.
                     </div>
                 </div>
             </div>
@@ -314,17 +302,16 @@
                     <button class="accordion-button collapsed" type="button"
                             data-bs-toggle="collapse" data-bs-target="#faqCollapse4"
                             aria-expanded="false" aria-controls="faqCollapse4">
-                        How do I set up WhatsApp or Telegram reminders?
+                        How do I set up Telegram reminders?
                     </button>
                 </h3>
                 <div id="faqCollapse4" class="accordion-collapse collapse"
                      aria-labelledby="faqHeading4" data-bs-parent="#faqAccordion">
                     <div class="accordion-body">
-                        On your profile page you can add your phone number (for
-                        WhatsApp) and connect Telegram with one tap — no chat ID
-                        to look up. Then, when adding an account, simply tick the
-                        channels you want to use. Each account can have its own
-                        combination of channels.
+                        On your profile page, tap "Connect Telegram" — one tap,
+                        no chat ID to look up. Then, when adding an account,
+                        simply tick the channels you want to use. Each account
+                        can have its own combination of channels.
                     </div>
                 </div>
             </div>
@@ -359,9 +346,9 @@
                 <div id="faqCollapse6" class="accordion-collapse collapse"
                      aria-labelledby="faqHeading6" data-bs-parent="#faqAccordion">
                     <div class="accordion-body">
-                        No. Your email, phone number, and Telegram chat ID are used
-                        solely to send you reminders. We never sell or share your
-                        personal information with third parties.
+                        No. Your email and Telegram chat ID are used solely to
+                        send you reminders. We never sell or share your personal
+                        information with third parties.
                     </div>
                 </div>
             </div>
