@@ -92,6 +92,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "forex_reminder.middleware.ContentSecurityPolicyMiddleware",
 ]
 
 
@@ -102,6 +103,15 @@ AUTH_USER_MODEL = "accounts.User"
 
 # django-allauth
 SITE_ID = 1
+
+# Used to seed the django.contrib.sites Site row (accounts/migrations) and
+# for SEO meta tags (canonical URL / Open Graph). Defaults to the local dev
+# server; set to the real production host in .env, e.g.
+# SITE_DOMAIN=fair.tergym.com, SITE_SCHEME=https.
+SITE_NAME = config("SITE_NAME", default="FAIR")
+SITE_DOMAIN = config("SITE_DOMAIN", default="127.0.0.1:8000")
+SITE_SCHEME = config("SITE_SCHEME", default="http" if DEBUG else "https")
+
 AUTHENTICATION_BACKENDS = [
     # Needed for allauth
     "django.contrib.auth.backends.ModelBackend",
@@ -137,6 +147,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "forex_reminder.context_processors.site",
             ],
         },
     },

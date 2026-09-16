@@ -13,6 +13,21 @@ def home(request):
     return render(request, "home.html")
 
 
+def privacy(request):
+    """Public privacy policy page."""
+    return render(request, "privacy.html")
+
+
+def terms(request):
+    """Public terms of service page."""
+    return render(request, "terms.html")
+
+
+def contact(request):
+    """Public contact/support page."""
+    return render(request, "contact.html")
+
+
 @login_required
 def dashboard(request):
     """User dashboard (shown after login).

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 56" width="200" height="56" role="img" aria-labelledby="fairLogoTitle">
+  <title id="fairLogoTitle">FAIR — Forex Account Inactivity Reminder</title>
+  <rect width="200" height="56" rx="12" fill="#0f2027"/>
+  <polyline points="16,34 22,28 26,31 36,19" fill="none" stroke="#5ec8f2" stroke-width="3.2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="29,19 36,19 36,26" fill="none" stroke="#5ec8f2" stroke-width="3.2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="54" y="38" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="800"
+        letter-spacing="1" fill="#ffffff">FAIR</text>
+</svg>

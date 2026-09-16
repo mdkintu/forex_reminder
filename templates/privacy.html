@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy — FAIR{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="How FAIR collects, uses and protects your data: what we store, who we share it with to deliver reminders, and how to request deletion.">
+{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 760px;">
+    <h1 class="h3 mb-1">Privacy Policy</h1>
+    <p class="text-secondary small mb-4">Last updated: September 2026</p>
+
+    <div class="alert alert-secondary small">
+        This page is a plain-language starting point, not a substitute for
+        review by a qualified lawyer. Before relying on it for a live product
+        handling real users' data, have it reviewed for your jurisdiction.
+    </div>
+
+    <h2 class="h5 mt-4">What we collect</h2>
+    <p>To run your inactivity reminders, FAIR stores:</p>
+    <ul>
+        <li>Your email address (required to sign in).</li>
+        <li>Your name, phone number and Telegram chat ID, if you choose to add them — used only to address and deliver reminders.</li>
+        <li>Your browser-detected timezone, so reminders line up with your local calendar day.</li>
+        <li>The trading accounts you add: account name, account number, broker name, last-trade date/time, and which reminder channels you've enabled.</li>
+        <li>A log of reminders sent (date, channel, status), so you can see your own history and we don't send duplicates.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">What we don't collect</h2>
+    <ul>
+        <li>We never ask for or store your broker login, password, or trading platform credentials.</li>
+        <li>We don't collect payment card details — FAIR does not process payments.</li>
+        <li>We don't run third-party advertising or analytics trackers on this site.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Who we share it with</h2>
+    <p>
+        We don't sell or rent your data. We share the minimum needed to deliver
+        a reminder with the service you asked for that reminder to go through:
+    </p>
+    <ul>
+        <li><strong>Email</strong> — sent via our configured SMTP provider.</li>
+        <li><strong>WhatsApp</strong> — sent via Twilio, using the phone number on your profile.</li>
+        <li><strong>Telegram</strong> — sent via the Telegram Bot API, using the chat ID on your profile.</li>
+    </ul>
+    <p>Each of those services only receives the message text and the contact detail needed to deliver it.</p>
+
+    <h2 class="h5 mt-4">Cookies</h2>
+    <p>
+        FAIR uses only the functional cookies Django needs to keep you signed
+        in and to protect forms from cross-site request forgery. No
+        third-party tracking or advertising cookies are set.
+    </p>
+
+    <h2 class="h5 mt-4">Data retention and deletion</h2>
+    <p>
+        We keep your account and trading-account data for as long as your
+        account exists. To request deletion of your account and associated
+        data, or to ask what we hold about you, see our
+        <a href="{% url 'accounts:contact' %}">Contact</a> page.
+    </p>
+
+    <h2 class="h5 mt-4">Security</h2>
+    <p>
+        Passwords are stored using Django's built-in salted hashing — we
+        never see or store your plaintext password. In production the site
+        is served over HTTPS with secure, HTTP-only session cookies.
+    </p>
+
+    <h2 class="h5 mt-4">Changes to this policy</h2>
+    <p>
+        If this policy changes materially, we'll update the date at the top
+        of this page.
+    </p>
+
+    <h2 class="h5 mt-4">Contact</h2>
+    <p>
+        Questions about this policy or your data? Reach us via the
+        <a href="{% url 'accounts:contact' %}">Contact page</a>.
+    </p>
+</div>
+{% endblock %}

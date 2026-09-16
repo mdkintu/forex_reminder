@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Sign In — FAIR{% endblock %}
 
@@ -6,6 +7,9 @@
 <div class="container py-5" style="max-width: 440px;">
     <div class="card shadow-sm">
         <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <img src="{% static 'images/logo.svg' %}" alt="FAIR" height="40">
+            </div>
             <h1 class="h4 card-title text-center mb-4">Sign In</h1>
 
             <form method="post" action="{% url 'account_login' %}" novalidate>

@@ -5,6 +5,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Forex Account Inactivity Reminder (FAIR){% endblock %}</title>
+
+    {% block meta_description %}
+    <meta name="description" content="FAIR tracks your prop-firm and forex trading accounts and reminds you by email, WhatsApp or Telegram before an inactivity clause closes them.">
+    {% endblock %}
+    <link rel="canonical" href="{{ site_url }}{{ request.path }}">
+
+    {% block og_tags %}
+    <meta property="og:site_name" content="{{ site_name }}">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="FAIR — Forex Account Inactivity Reminder">
+    <meta property="og:description" content="Never lose a funded or prop-firm account to an inactivity clause — FAIR reminds you before the deadline.">
+    <meta property="og:url" content="{{ site_url }}{{ request.path }}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="FAIR — Forex Account Inactivity Reminder">
+    <meta name="twitter:description" content="Never lose a funded or prop-firm account to an inactivity clause — FAIR reminds you before the deadline.">
+    {% endblock %}
+
+    <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,13 +32,15 @@
     <link rel="stylesheet" href="{% static 'css/clock.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="d-flex flex-column min-vh-100">
+<body class="d-flex flex-column min-vh-100"
+      {% if user.is_authenticated %}data-user-timezone="{{ user.timezone|default:'' }}"{% endif %}>
 
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="{% url 'accounts:home' %}">
-                📈 FAIR <span class="text-secondary small fw-light">Forex Account Inactivity Reminder</span>
+            <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'accounts:home' %}">
+                <img src="{% static 'images/logo.svg' %}" alt="FAIR" height="36">
+                <span class="text-secondary small fw-light">Forex Account Inactivity Reminder</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                     data-bs-target="#navbarNav" aria-controls="navbarNav"
@@ -82,7 +103,14 @@
     <!-- Footer -->
     <footer class="bg-dark text-light text-center py-3 mt-auto">
         <div class="container">
-            <small>&copy; 2025 Forex Account Inactivity Reminder (FAIR). All rights reserved.</small>
+            <div class="mb-2 small">
+                <a href="{% url 'accounts:privacy' %}" class="text-secondary text-decoration-none">Privacy</a>
+                <span class="text-secondary mx-2">·</span>
+                <a href="{% url 'accounts:terms' %}" class="text-secondary text-decoration-none">Terms</a>
+                <span class="text-secondary mx-2">·</span>
+                <a href="{% url 'accounts:contact' %}" class="text-secondary text-decoration-none">Contact</a>
+            </div>
+            <small>&copy; {% now "Y" %} Forex Account Inactivity Reminder (FAIR). All rights reserved.</small>
         </div>
     </footer>
 
@@ -90,28 +118,11 @@
     <script src="{% static 'js/clock.js' %}"></script>
 
     {% if user.is_authenticated %}
-    {% comment %}
-    Auto-detect the user's timezone (once) so "days since trade" is computed
-    in their local calendar day, not UTC. Sends ?tz= to the dashboard.
-    {% endcomment %}
-    <script>
-    (function () {
-        var detected = (function () {
-            try { return new Intl.DateTimeFormat().resolvedOptions().timeZone; }
-            catch (e) { return null; }
-        })();
-        if (!detected) return;
-        // Only bother if the server hasn't saved a timezone for this user yet.
-        var hasTz = "{{ user.timezone }}" && "{{ user.timezone }}" !== "UTC";
-        // Ping once per session so we don't loop. Use a flag in sessionStorage.
-        if (!hasTz && !sessionStorage.getItem("tz_auto_detected")) {
-            sessionStorage.setItem("tz_auto_detected", "1");
-            fetch(location.pathname + location.search +
-                  (location.search ? "&tz=" : "?tz=") + encodeURIComponent(detected),
-                  { method: "GET", credentials: "same-origin" });
-        }
-    })();
-    </script>
+    {# Auto-detect the user's timezone (once) so "days since trade" is computed
+       in their local calendar day, not UTC. See static/js/tz-detect.js —
+       kept out of an inline <script> so the CSP script-src doesn't need
+       'unsafe-inline'. #}
+    <script src="{% static 'js/tz-detect.js' %}" defer></script>
     {% endif %}
 
     {% block extra_js %}{% endblock %}

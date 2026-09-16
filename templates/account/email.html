@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Email — FAIR{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 600px;">
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h1 class="h4 card-title mb-1">Manage Email</h1>
+            <p class="text-secondary mb-4">
+                Your primary, verified email address is used to sign in and to
+                receive email reminders.
+            </p>
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger py-2">
+                    {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+                </div>
+            {% endif %}
+
+            {% if emailaddresses %}
+                <form method="post" action="{% url 'account_email' %}">
+                    {% csrf_token %}
+                    <ul class="list-group mb-3">
+                        {% for radio in emailaddress_radios %}
+                            {% with emailaddress=radio.emailaddress %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="radio" name="email"
+                                               id="{{ radio.id }}" value="{{ emailaddress.email }}"
+                                               {% if radio.checked %}checked{% endif %}>
+                                        <label class="form-check-label" for="{{ radio.id }}">
+                                            {{ emailaddress.email }}
+                                        </label>
+                                    </div>
+                                    <div>
+                                        {% if emailaddress.verified %}
+                                            <span class="badge bg-success">Verified</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">Unverified</span>
+                                        {% endif %}
+                                        {% if emailaddress.primary %}
+                                            <span class="badge bg-primary">Primary</span>
+                                        {% endif %}
+                                    </div>
+                                </li>
+                            {% endwith %}
+                        {% endfor %}
+                    </ul>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="submit" name="action_primary" class="btn btn-outline-primary btn-sm">
+                            Make Primary
+                        </button>
+                        <button type="submit" name="action_send" class="btn btn-outline-secondary btn-sm">
+                            Re-send Verification
+                        </button>
+                        <button type="submit" name="action_remove" class="btn btn-outline-danger btn-sm">
+                            Remove
+                        </button>
+                    </div>
+                </form>
+            {% else %}
+                <p class="text-secondary">You currently have no email address set up.</p>
+            {% endif %}
+
+            {% if can_add_email %}
+                <hr class="my-4">
+                <h2 class="h6 fw-semibold mb-3">Add Email Address</h2>
+                <form method="post" action="{% url 'account_email' %}" novalidate>
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label" for="id_email">Email</label>
+                        <input type="email" name="email" id="id_email"
+                               class="form-control" placeholder="you@example.com"
+                               value="{{ form.email.value|default:'' }}">
+                        {% for error in form.email.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" name="action_add" class="btn btn-primary btn-sm">
+                        Add Email
+                    </button>
+                </form>
+            {% endif %}
+
+            <hr class="my-4">
+            <a href="{% url 'accounts:profile' %}" class="btn btn-outline-secondary btn-sm">
+                Back to profile
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

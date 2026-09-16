@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Terms of Service — FAIR{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="The terms for using FAIR's forex and prop-firm account inactivity reminder service.">
+{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 760px;">
+    <h1 class="h3 mb-1">Terms of Service</h1>
+    <p class="text-secondary small mb-4">Last updated: September 2026</p>
+
+    <div class="alert alert-secondary small">
+        This page is a plain-language starting point, not a substitute for
+        review by a qualified lawyer. Before relying on it for a live product,
+        have it reviewed for your jurisdiction.
+    </div>
+
+    <h2 class="h5 mt-4">What FAIR is</h2>
+    <p>
+        FAIR is a reminder tool. It tracks the last-trade date you enter for
+        each trading account and sends you email, WhatsApp and/or Telegram
+        reminders on a configurable schedule, so you can act before an
+        inactivity clause affects your account.
+    </p>
+
+    <h2 class="h5 mt-4">Not a guarantee</h2>
+    <p>
+        FAIR is a convenience tool, not a substitute for checking your
+        broker's or prop firm's own inactivity rules directly. Reminder
+        delivery depends on third-party services (email providers, Twilio,
+        Telegram) that are outside our control and can occasionally be
+        delayed or fail. You remain solely responsible for keeping your
+        trading accounts active and for verifying the actual inactivity
+        policy that applies to each account.
+    </p>
+
+    <h2 class="h5 mt-4">Your account</h2>
+    <ul>
+        <li>You're responsible for keeping your login credentials confidential.</li>
+        <li>The information you enter (account names, last-trade dates, contact details) should be accurate — reminders are only as useful as the data behind them.</li>
+        <li>You may delete your trading accounts, or your whole account, at any time; see the <a href="{% url 'accounts:contact' %}">Contact</a> page for account deletion requests.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Acceptable use</h2>
+    <p>
+        Don't use FAIR to store or transmit anything unlawful, and don't try
+        to disrupt or gain unauthorized access to the service or other users'
+        data.
+    </p>
+
+    <h2 class="h5 mt-4">Service availability</h2>
+    <p>
+        FAIR is provided on an "as is" and "as available" basis, without
+        warranties of any kind. We don't guarantee uninterrupted access, and
+        we may change or discontinue features with reasonable notice where
+        practical.
+    </p>
+
+    <h2 class="h5 mt-4">Limitation of liability</h2>
+    <p>
+        To the fullest extent permitted by law, FAIR and its operators are
+        not liable for losses arising from a missed, delayed, or failed
+        reminder, including account closures resulting from inactivity. Use
+        FAIR as one layer of protection, not your only one.
+    </p>
+
+    <h2 class="h5 mt-4">Changes to these terms</h2>
+    <p>
+        If these terms change materially, we'll update the date at the top of
+        this page.
+    </p>
+
+    <h2 class="h5 mt-4">Contact</h2>
+    <p>
+        Questions about these terms? Reach us via the
+        <a href="{% url 'accounts:contact' %}">Contact page</a>.
+    </p>
+</div>
+{% endblock %}

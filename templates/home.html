@@ -3,6 +3,21 @@
 
 {% block title %}Never Lose Your Forex Account to Inactivity{% endblock %}
 
+{% block meta_description %}
+<meta name="description" content="Most prop firms close accounts after ~30 days without a trade. FAIR watches the clock for every funded account you add and reminds you by email, WhatsApp or Telegram before it's too late.">
+{% endblock %}
+
+{% block og_tags %}
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Never Lose Your Forex Account to Inactivity — FAIR">
+<meta property="og:description" content="Most prop firms close accounts after ~30 days without a trade. FAIR reminds you before it's too late.">
+<meta property="og:url" content="{{ site_url }}{{ request.path }}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Never Lose Your Forex Account to Inactivity — FAIR">
+<meta name="twitter:description" content="Most prop firms close accounts after ~30 days without a trade. FAIR reminds you before it's too late.">
+{% endblock %}
+
 {% block extra_head %}
 <style>
     .hero {
@@ -121,9 +136,9 @@
                 <p class="text-uppercase small text-warning fw-semibold mb-2">For funded &amp; prop traders</p>
                 <h2 class="fw-bold mb-3">Most prop firms close inactive accounts within 30 days.</h2>
                 <p class="mb-4 text-white-50">
-                    Whether you're trading a FTMO, FundedNext, MyForexFunds-style
-                    evaluation, or a funded account, an inactivity clause is a
-                    common rule. Here's how most firms handle it:
+                    Whether you're trading an FTMO, FundedNext, or other
+                    prop-firm evaluation, or a funded account, an inactivity
+                    clause is a common rule. Here's how most firms handle it:
                 </p>
                 <ul class="list-unstyled mb-4 text-white-50">
                     <li class="mb-2">📌 <strong class="text-white">No trade for 30 days</strong> — account flagged / risks closure.</li>
@@ -267,10 +282,11 @@
                 <div id="faqCollapse2" class="accordion-collapse collapse"
                      aria-labelledby="faqHeading2" data-bs-parent="#faqAccordion">
                     <div class="accordion-body">
-                        Once you add an account, we run a daily check. On the day
-                        marks you've chosen (for example, 10, 15, 25, and 30 days
-                        since your last trade) we send a reminder through whichever
-                        channels you've enabled — email, WhatsApp, or Telegram.
+                        Once you add an account, we check it twice a day (9 AM and
+                        2 PM your local time). On the day marks you've chosen (for
+                        example, 10, 15, 25, and 30 days since your last trade) we
+                        send a reminder through whichever channels you've enabled —
+                        email, WhatsApp, or Telegram.
                     </div>
                 </div>
             </div>

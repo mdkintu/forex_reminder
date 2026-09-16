@@ -15,7 +15,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "days",
             nargs="*",
-            type=int,
+            # Left as strings (not type=int) so a stray non-numeric CLI
+            # argument is skipped with a warning by _parse_days below,
+            # instead of argparse rejecting the whole command outright.
+            type=str,
             help="Optional day numbers given on the command line. "
                  "If omitted, you will be prompted to type them in.",
         )

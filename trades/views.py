@@ -1,3 +1,6 @@
+from datetime import time
+
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import (
@@ -10,6 +13,12 @@ from django.views.generic import (
 
 from .forms import TradingAccountForm
 from .models import TradingAccount
+
+
+def _send_hours_label() -> str:
+    """A human-friendly label for settings.REMINDER_SEND_HOURS, e.g. "9 AM / 2 PM"."""
+    hours = sorted(set(getattr(settings, "REMINDER_SEND_HOURS", [9, 14])))
+    return " / ".join(time(hour=h).strftime("%I %p").lstrip("0") for h in hours)
 
 
 class TradingAccountListView(LoginRequiredMixin, ListView):
@@ -45,6 +54,7 @@ class TradingAccountDetailView(LoginRequiredMixin, DetailView):
         context["deadline"] = self.object.deadline_iso()
         # Reminder history for this account, newest first.
         context["reminder_history"] = self.object.reminders.order_by("-sent_at")
+        context["send_hours_label"] = _send_hours_label()
         return context
 
 

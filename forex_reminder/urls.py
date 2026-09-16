@@ -10,8 +10,8 @@ urlpatterns = [
     # django-allauth handles auth (login, signup, logout, password reset, etc.)
     path("accounts/", include("allauth.urls")),
     # Local accounts app. The root URL ("") serves the public landing page
-    # via a TemplateView (see accounts.views.HomeView), plus /dashboard/ and
-    # /profile/ for authenticated users.
+    # via accounts.views.home, plus /dashboard/ and /profile/ for
+    # authenticated users.
     path("", include("accounts.urls")),
     path("trades/", include("trades.urls")),
 ]

@@ -19,6 +19,12 @@ ALLOWED_HOSTS=fair.tergym.com,127.0.0.1,localhost
 # Trust the HTTPS origin so POST forms (login/signup) work over SSL.
 CSRF_TRUSTED_ORIGINS=https://fair.tergym.com
 
+# --- Site identity ---
+# Used in confirmation/verification emails and SEO meta tags.
+SITE_NAME=FAIR
+SITE_DOMAIN=fair.tergym.com
+SITE_SCHEME=https
+
 # --- Database ---
 # Shared hosting provides MySQL via cPanel. Create a DB + user in cPanel's
 # "MySQL Databases" and put the credentials here:

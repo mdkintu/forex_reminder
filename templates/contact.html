@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Contact — FAIR{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="Get in touch with FAIR for support, account deletion requests, or questions about the service.">
+{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 560px;">
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h1 class="h4 card-title mb-3">Contact</h1>
+            <p class="text-secondary">
+                Questions about your account, a reminder that didn't arrive,
+                or a request to delete your data — reach us at:
+            </p>
+            <p class="mb-4">
+                <a class="fs-5 fw-semibold text-decoration-none" href="mailto:support@fair.tergym.com">
+                    support@fair.tergym.com
+                </a>
+            </p>
+            <p class="text-secondary small mb-0">
+                We aim to respond within a few business days. For details on
+                what we store and how, see the
+                <a href="{% url 'accounts:privacy' %}">Privacy Policy</a>.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -341,17 +341,49 @@ def test_task_marks_unconfigured_channel_skipped(user, schedule, mock_notifiers)
 
 @pytest.mark.django_db
 def test_task_skips_accounts_past_deadline(user, mock_notifiers):
-    """No reminder once the 30-day deadline has passed, even on a schedule day."""
-    ReminderSchedule.objects.create(day_list=[30])
+    """No reminder once the account is genuinely past the 30-day threshold."""
+    ReminderSchedule.objects.create(day_list=[31])
     TradingAccount.objects.create(
         user=user,
         account_name="Closed",
-        last_trade_date=timezone.now() - timedelta(days=30, minutes=1),
+        last_trade_date=timezone.now() - timedelta(days=31),
         notify_email=True,
     )
 
     assert tasks.check_and_send_reminders() == 0
     assert ReminderHistory.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_task_sends_on_day_30_even_if_last_trade_was_earlier_today(
+    user, mock_notifiers, settings
+):
+    """Day 30 still sends even when the last trade's time-of-day is earlier
+    than the send hour (this used to be silently skipped: the exact
+    last_trade + 30 days deadline instant would already be in the past by
+    the time the send hour arrived, even though today is still day 30)."""
+    ReminderSchedule.objects.create(day_list=[30])
+    tz = user.get_timezone()
+    now_local = timezone.localtime(timezone.now(), tz)
+    settings.REMINDER_SEND_HOURS = [now_local.hour]
+
+    # Last trade 30 calendar days ago, at midnight local time -- i.e. earlier
+    # in the day than "now", so last_trade_date + 30 days (the exact
+    # deadline) has already passed today even though today is exactly day 30.
+    last_trade = (now_local - timedelta(days=30)).replace(
+        hour=0, minute=1, second=0, microsecond=0
+    )
+    account = TradingAccount.objects.create(
+        user=user,
+        account_name="LastChance",
+        last_trade_date=last_trade,
+        notify_email=True,
+    )
+    assert account.days_since_last_trade == 30
+    assert timezone.now() >= account.deadline  # the exact instant has passed
+
+    assert tasks.check_and_send_reminders() == 1
+    assert ReminderHistory.objects.filter(account=account, day_number=30).exists()
 
 
 @pytest.mark.django_db

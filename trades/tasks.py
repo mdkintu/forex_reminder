@@ -168,8 +168,13 @@ def check_and_send_reminders() -> int:
         if days_since not in reminder_days:
             continue
 
-        # Never remind about an account that has already passed its deadline.
-        if timezone.now() >= account.deadline:
+        # Never remind about an account that's genuinely past the inactivity
+        # threshold. Compared by calendar day (days_since), not the exact
+        # deadline instant (last_trade_date + 30 days to the second) — that
+        # instant is tied to the original trade's time-of-day and would
+        # wrongly hide the day-30 reminder whenever the last trade happened
+        # earlier in the day than the configured send hours.
+        if days_since > TradingAccount.INACTIVITY_THRESHOLD_DAYS:
             continue
 
         # The delivery slot that is due now in the owner's local time (the

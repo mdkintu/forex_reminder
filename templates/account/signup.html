@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Sign Up — FAIR{% endblock %}
 
@@ -6,6 +7,9 @@
 <div class="container py-5" style="max-width: 440px;">
     <div class="card shadow-sm">
         <div class="card-body p-4">
+            <div class="text-center mb-4">
+                <img src="{% static 'images/logo.svg' %}" alt="FAIR" height="40">
+            </div>
             <h1 class="h4 card-title text-center mb-4">Create your account</h1>
 
             <form method="post" action="{% url 'account_signup' %}" novalidate>
@@ -54,6 +58,12 @@
 
                 <button type="submit" class="btn btn-primary w-100">Sign Up</button>
             </form>
+
+            <p class="text-center text-secondary small mt-3 mb-0">
+                By signing up, you agree to our
+                <a href="{% url 'accounts:terms' %}">Terms</a> and
+                <a href="{% url 'accounts:privacy' %}">Privacy Policy</a>.
+            </p>
 
             <hr>
             <p class="text-center small mb-0">

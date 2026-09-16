@@ -26,10 +26,12 @@ class ReminderSchedule(models.Model):
     multiple values) through the ``set_reminder_days`` management command.
     """
 
-    #: Default day numbers used if no schedule row exists yet.
-    # The last reminder is day 29: on day 30 the account may already have been
-    # closed (the deadline is exactly 30 days after the last trade).
-    DEFAULT_DAYS = [10, 15, 25, 26, 27, 28, 29]
+    #: Default day numbers used if no schedule row exists yet. Day 30 (the
+    #: inactivity threshold itself) is included as the final, most urgent
+    #: reminder — see the day-vs-deadline comparison note on
+    #: TradingAccount.next_reminder_datetime and trades.tasks for why this
+    #: must be compared by calendar day, not by the exact deadline instant.
+    DEFAULT_DAYS = [10, 15, 25, 26, 27, 28, 29, 30]
 
     day_list = models.JSONField(
         default=list,
@@ -167,7 +169,13 @@ class TradingAccount(models.Model):
             )
 
         # Case 1: today is a schedule day -> next slot today, if any.
-        if days_since in schedule:
+        # Compared by calendar day (days_since), not the exact deadline
+        # instant: deadline is last_trade_date + 30 days to the second, tied
+        # to the original trade's time-of-day, while days_since is a plain
+        # calendar-date difference. Comparing a slot time against the exact
+        # deadline would wrongly hide the day-30 reminder whenever the last
+        # trade happened earlier in the day than the send hours.
+        if days_since in schedule and days_since <= self.INACTIVITY_THRESHOLD_DAYS:
             for hour in send_hours:
                 slot_dt = at_hour(today, hour)
                 if slot_dt <= now_local:
@@ -177,8 +185,6 @@ class TradingAccount(models.Model):
                 prior = [h for h in send_hours if h < hour]
                 if prior and traded_after(max(prior)):
                     continue
-                if slot_dt >= self.deadline:
-                    continue
                 return slot_dt
             # All today's slots are past -> fall through to next schedule day.
 
@@ -186,11 +192,10 @@ class TradingAccount(models.Model):
         future = [d for d in schedule if d > days_since]
         if future:
             next_day = min(future)
-            slot_dt = at_hour(
-                today + timezone.timedelta(days=next_day - days_since), send_hours[0]
-            )
-            if slot_dt < self.deadline:
-                return slot_dt
+            if next_day <= self.INACTIVITY_THRESHOLD_DAYS:
+                return at_hour(
+                    today + timezone.timedelta(days=next_day - days_since), send_hours[0]
+                )
 
         # No next schedule day (e.g. past the last mark / inactive).
         return None

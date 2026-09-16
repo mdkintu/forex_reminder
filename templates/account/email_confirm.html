@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Email Address — FAIR{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 480px;">
+    <div class="card shadow-sm">
+        <div class="card-body p-4 text-center">
+            <h1 class="h4 card-title mb-3">Confirm Email Address</h1>
+
+            {% if confirmation %}
+                {% if can_confirm %}
+                    <p class="text-secondary mb-4">
+                        Please confirm that
+                        <strong>{{ confirmation.email_address.email }}</strong>
+                        is an email address for
+                        {{ confirmation.email_address.user }}.
+                    </p>
+                    <form method="post" action="{% url 'account_confirm_email' confirmation.key %}">
+                        {% csrf_token %}
+                        {% if redirect_field_value %}
+                            <input type="hidden" name="{{ redirect_field_name }}"
+                                   value="{{ redirect_field_value }}">
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary px-4">Confirm</button>
+                    </form>
+                {% else %}
+                    <p class="text-secondary mb-0">
+                        Unable to confirm this email address because it's
+                        already confirmed by a different account.
+                    </p>
+                {% endif %}
+            {% else %}
+                <p class="text-secondary mb-4">
+                    This email confirmation link has expired or is invalid.
+                </p>
+                <a href="{% url 'account_email' %}" class="btn btn-outline-primary px-4">
+                    Request a new confirmation link
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
