@@ -63,10 +63,11 @@ class Command(BaseCommand):
             nxt = account.next_reminder_datetime()
             nxt_label = nxt.strftime("%Y-%m-%d %H:%M %Z") if nxt else "none"
             slot = f" at {decision.slot_hour:02d}:00" if decision.slot_hour is not None else ""
+            catch_up = f" (catch-up of day {decision.day_number})" if decision.catch_up else ""
             self.stdout.write(
                 f"  #{account.pk} {account.account_name!r} ({account.user.email}, "
-                f"{account.user.timezone}): day {decision.day_number}, "
-                f"{account.days_remaining} left -> {decision.reason}{slot} | next: {nxt_label}"
+                f"{account.user.timezone}): day {account.days_since_last_trade}, "
+                f"{account.days_remaining} left -> {decision.reason}{catch_up}{slot} | next: {nxt_label}"
             )
         self.stdout.write(f"Checked {summary.checked}: {self._reasons(summary)}")
 

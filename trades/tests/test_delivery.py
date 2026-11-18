@@ -207,3 +207,17 @@ def test_test_reminder_is_rate_limited(authenticated_client, tg):
 @pytest.mark.django_db
 def test_test_reminder_requires_post(authenticated_client):
     assert authenticated_client.get(reverse("accounts:test_reminder")).status_code == 405
+
+
+@pytest.mark.django_db
+def test_dry_run_labels_catch_up(user, send_mail):
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    ReminderSchedule.objects.create(days_left=[20])  # day 10
+    _acct(user, 11, name="Late one")
+    out = StringIO()
+    call_command("send_reminders", "--dry-run", stdout=out)
+    line = next(l for l in out.getvalue().splitlines() if "Late one" in l)
+    assert "day 11" in line and "catch-up of day 10" in line

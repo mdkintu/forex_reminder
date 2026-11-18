@@ -400,11 +400,12 @@ def run_reminders(dry_run: bool = False) -> RunSummary:
         summary.reasons[decision.reason] += 1
         summary.decisions.append((account, decision))
         logger.info(
-            "[reminder] account %s '%s': day %s -> %s",
+            "[reminder] account %s '%s': day %s -> %s%s",
             account.pk,
             account.account_name,
-            decision.day_number,
+            account.days_since_last_trade,
             decision.reason,
+            f" (catch-up of day {decision.day_number})" if decision.catch_up else "",
         )
         if decision.due and not dry_run:
             _send_due_reminders(account, decision, summary)
