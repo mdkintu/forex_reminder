@@ -189,7 +189,7 @@ def evaluate_account(account, reminder_days, send_hours, grace_hours, now=None) 
     # instant is tied to the original trade's time-of-day and would
     # wrongly hide the day-30 reminder whenever the last trade happened
     # earlier in the day than the configured send hours.
-    if days_since > TradingAccount.INACTIVITY_THRESHOLD_DAYS:
+    if days_since > account.inactivity_days:
         return Decision(PAST_DEADLINE, days_since)
 
     # The delivery slot that is due now in the owner's local time (the
@@ -306,8 +306,9 @@ def _send_due_reminders(account, decision, summary) -> None:
 def run_reminders(dry_run: bool = False) -> RunSummary:
     """Check every trading account and send the reminders that are due.
 
-    On a scheduled reminder day (days-since-last-trade in the global
-    :class:`ReminderSchedule`), the reminder is sent once per enabled channel
+    On a reminder day (the account's "days left" schedule — its own override,
+    its owner's default, or the site-wide :class:`ReminderSchedule` —
+    converted with its inactivity limit), the reminder is sent once per enabled channel
     at each configured local delivery hour (settings.REMINDER_SEND_HOURS),
     recording each (account, cycle, day, channel, hour) in
     :class:`ReminderHistory` so the same slot is never sent twice.
@@ -318,12 +319,14 @@ def run_reminders(dry_run: bool = False) -> RunSummary:
     """
     started_at = timezone.now()
     summary = RunSummary()
-    reminder_days = ReminderSchedule.get().days()
+    global_days_left = ReminderSchedule.get().days_left_list()
     send_hours = getattr(settings, "REMINDER_SEND_HOURS", [9, 14])
     grace_hours = getattr(settings, "REMINDER_GRACE_HOURS", 3)
 
     for account in TradingAccount.objects.select_related("user").all():
-        decision = evaluate_account(account, reminder_days, send_hours, grace_hours)
+        decision = evaluate_account(
+            account, account.reminder_days(global_days_left), send_hours, grace_hours
+        )
         summary.checked += 1
         summary.reasons[decision.reason] += 1
         summary.decisions.append((account, decision))

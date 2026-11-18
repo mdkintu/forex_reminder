@@ -25,7 +25,7 @@
                 <p class="mb-1"><strong>{{ account.account_name }}</strong>{% if account.account_number %} (#{{ account.account_number }}){% endif %}</p>
                 <p class="text-secondary">
                     Confirm to record a trade now and restart this account's
-                    {{ account.INACTIVITY_THRESHOLD_DAYS }}-day inactivity countdown.
+                    {{ account.inactivity_days }}-day inactivity countdown.
                 </p>
                 <form method="post">
                     {% csrf_token %}

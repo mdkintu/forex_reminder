@@ -1,14 +1,16 @@
-from django.core.management.base import BaseCommand
 from django.core.exceptions import ValidationError
+from django.core.management.base import BaseCommand
 
+from trades.daylists import days_after_to_days_left, parse_day_list
 from trades.models import ReminderSchedule
 
 
 class Command(BaseCommand):
     help = (
-        "Interactively set the reminder day numbers (days after last trade). "
-        "Accepts multiple values separated by commas and/or spaces. "
-        "Examples: 10 15 25 30    |    10,15,25,26,27,28,29,30"
+        "Set the site-wide reminder days as DAYS LEFT before each account's "
+        "inactivity deadline (0 = the deadline day). Accepts multiple values "
+        "separated by commas and/or spaces. Examples: 20 15 5 3 1 0  |  "
+        "20,10,3,1,0. Users and accounts can override this."
     )
 
     def add_arguments(self, parser):
@@ -16,57 +18,42 @@ class Command(BaseCommand):
             "days",
             nargs="*",
             # Left as strings (not type=int) so a stray non-numeric CLI
-            # argument is skipped with a warning by _parse_days below,
-            # instead of argparse rejecting the whole command outright.
+            # argument is skipped with a warning instead of argparse
+            # rejecting the whole command outright.
             type=str,
-            help="Optional day numbers given on the command line. "
-                 "If omitted, you will be prompted to type them in.",
+            help="Days-left values. If omitted, you will be prompted to type them in.",
+        )
+        parser.add_argument(
+            "--days-after",
+            action="store_true",
+            help="Interpret the values the old way, as days SINCE the last trade "
+            "for a 30-day limit (e.g. 10 15 25 30), and convert them.",
         )
 
-    def _parse_days(self, values):
-        """Flatten CLI ints and prompted tokens into a list of ints.
-
-        Non-numeric tokens are skipped with a warning (so a stray word in
-        keyboard input doesn't crash the command).
-        """
-        parsed = []
-        for value in values:
-            for part in str(value).replace(",", " ").split():
-                if not part.strip():
-                    continue
-                try:
-                    parsed.append(int(part))
-                except (TypeError, ValueError):
-                    self.stdout.write(
-                        self.style.WARNING(f"  skipping non-numeric value: '{part}'")
-                    )
-        return parsed
-
     def handle(self, *args, **options):
-        days_input = options["days"]
+        current = ReminderSchedule.get().days_left_list()
+        self.stdout.write("Current reminder days (days left): " + ", ".join(map(str, current)))
 
-        # Gather via keyboard prompt if nothing was given on the CLI.
+        days_input = options["days"]
         if not days_input:
             raw = input(
-                "Enter reminder day numbers (comma/space separated, "
-                "multiple allowed, e.g. '10 15 25 30'): "
+                "Enter reminder days as DAYS LEFT before the deadline "
+                "(comma/space separated, 0 = deadline day, e.g. '20 15 5 3 1 0'): "
             )
-            days_input = raw.replace(",", " ").split()
+            days_input = [raw]
 
-        if not days_input:
-            self.stderr.write(self.style.ERROR("No reminder days provided. Aborting."))
-            return
-
-        # Flatten (in case comma/space was mixed) and dedupe + sort.
-        flat = self._parse_days(days_input)
-        days = sorted(set(flat))
+        days, invalid = parse_day_list(days_input)
+        for token in invalid:
+            self.stdout.write(self.style.WARNING(f"  skipping non-numeric value: '{token}'"))
+        if options["days_after"]:
+            days = days_after_to_days_left(days)
 
         if not days:
             self.stderr.write(self.style.ERROR("No valid days parsed. Aborting."))
             return
 
         schedule = ReminderSchedule.get()
-        schedule.day_list = days
+        schedule.days_left = days
         try:
             schedule.full_clean()  # runs the model validators
         except ValidationError as e:
@@ -76,11 +63,10 @@ class Command(BaseCommand):
         schedule.save()  # get() may return an unsaved default, so save() persists it
 
         self.stdout.write(
-            self.style.SUCCESS(
-                "Reminder schedule set to: " + " ".join(str(d) for d in days)
-            )
+            self.style.SUCCESS("Reminder days set to (days left): " + ", ".join(map(str, days)))
         )
         self.stdout.write(
-            "Reminders will now fire on the following days after last trade:\n"
-            + self.style.WARNING(", ".join(str(d) for d in days))
+            "For a 30-day account that is days "
+            + ", ".join(str(30 - d) for d in sorted(days, reverse=True) if d <= 30)
+            + " after the last trade."
         )

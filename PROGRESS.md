@@ -32,6 +32,14 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - `trades/notifications.py`: shared `_run_bot` runner, `buttons=` on `send_telegram_message`, `answer_callback_query`, `edit_message_text`.
 - **Deploy:** `git pull`, restart, then **re-run `python manage.py set_telegram_webhook`** (registers callbacks + command menu). Test: send `/status` to the bot.
 
+### Phase 3: per-account limits, reminders as "days left" ✅ (deploy pending)
+- `TradingAccount.inactivity_days` (default 30) drives deadline, days left, past-deadline checks, report and bot.
+- Reminder days are "days left" (0 = deadline day). `ReminderSchedule.day_list` → `days_left` (migration 0007 converts `30 - d`; live `[10,15,20]` → `[20,15,10]`). Default `[20,15,5,4,3,2,1,0]`.
+- Overrides: `TradingAccount.reminder_days_left` > `User.reminder_days_left` > site schedule > default (`TradingAccount.reminder_days_left_values()` / `reminder_days()`).
+- Forms: account form gets limit (14/21/30 presets) + optional days-left list; profile gets the user default. Helpers in `trades/daylists.py`.
+- `set_reminder_days` takes days-left values (`--days-after` converts old style).
+- **Deploy:** `git pull`, `migrate` (accounts 0006, trades 0007), restart. Then set the real schedule, e.g. `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, and set each account's limit if the firm isn't 30 days.
+
 ---
 
 ## Tech Stack
@@ -73,7 +81,7 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
   - `deadline`: last_trade_date + 30 days
 
 ### ReminderSchedule (trades/models.py)
-- Singleton JSON field `day_list` (reminder day numbers, default: [10,15,25,26,27,28,29,30])
+- Singleton JSON field `days_left` (days before each account's deadline; default [20,15,5,4,3,2,1,0]; 0 = deadline day)
 - `ReminderSchedule.get()`: returns existing or unsaved default
 - Day 30 is in the default: compared by calendar day (local TZ), not the exact deadline instant
 

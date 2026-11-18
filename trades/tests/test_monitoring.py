@@ -146,7 +146,7 @@ def admin_chat(settings):
 
 @pytest.mark.django_db
 def test_report_sent_once_per_day_and_flags_at_risk(user, mock_notifiers, admin_chat):
-    ReminderSchedule.objects.create(day_list=[10])
+    ReminderSchedule.objects.create(days_left=[20])
     _account(user, 28, name="Nearly closed")  # 2 days left, nothing delivered
     tasks.run_reminders()
 
@@ -162,7 +162,7 @@ def test_report_sent_once_per_day_and_flags_at_risk(user, mock_notifiers, admin_
 
 @pytest.mark.django_db
 def test_report_not_flagged_when_reminder_delivered(user, mock_notifiers, admin_chat):
-    ReminderSchedule.objects.create(day_list=[28])
+    ReminderSchedule.objects.create(days_left=[2])
     _account(user, 28, name="Reminded")
     tasks.run_reminders()  # sends the day-28 reminder
 

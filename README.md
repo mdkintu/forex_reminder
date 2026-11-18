@@ -9,7 +9,8 @@ inactivity clause.
 
 It tracks the days since your last trade on each account and sends reminders
 **twice daily (9 AM and 2 PM, in the user's local timezone)** on a configurable
-schedule of day numbers (default: 10, 15, 25–30).
+schedule of days left before each account's own deadline (default: 20, 15 and
+5–0 days left, i.e. days 10, 15 and 25–30 for a 30-day account).
 
 Built with:
 
@@ -202,16 +203,25 @@ python manage.py create_reminder_schedule
 
 ### Configuring reminder days
 
-The default reminder day numbers are `[10, 15, 25, 26, 27, 28, 29, 30]`. Day 30
-is the final, most urgent reminder. Days are counted as calendar days in the
-user's timezone, so the day-30 reminder still goes out on day 30 even if the
-exact deadline (last trade + 30 days, to the second) falls earlier that day.
-Accounts more than 30 days inactive get no further reminders. These defaults
-apply only until a schedule is saved; once a `ReminderSchedule` row exists,
-its day list is used instead. To view or change them interactively:
+Each trading account has its own **inactivity limit** (`inactivity_days`,
+default 30; set it to your firm's rule, e.g. 14 or 21). Reminder days are
+**days left before that deadline**, so one list works for every limit:
+
+- Default: `[20, 15, 5, 4, 3, 2, 1, 0]`, which is days 10, 15 and 25–30 for a 30-day
+  account. `0` is the deadline day itself, the final and most urgent reminder.
+  Values larger than an account's limit are ignored for that account.
+- Which list applies: the **account's own** list (account form), else the
+  **user's default** (profile page), else the **site-wide** schedule (admin, or
+  the command below), else the built-in default.
+- Days are calendar days in the user's timezone, so the deadline-day reminder
+  still goes out even if the exact deadline (last trade + limit, to the
+  second) falls earlier that day. Accounts past their limit get no reminders.
+
+Set the site-wide list (as days left):
 
 ```bash
-python manage.py set_reminder_days
+python manage.py set_reminder_days 20 15 5 3 1 0
+python manage.py set_reminder_days --days-after 10 15 25 30   # old style, converted
 ```
 
 ---

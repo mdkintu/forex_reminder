@@ -1,42 +1,40 @@
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
-
-def validate_reminder_days(value):
-    """Reject an empty or non-integer reminder-day list."""
-    if not isinstance(value, list) or not value:
-        raise ValidationError(
-            "Reminder day list must be a non-empty list of integers."
-        )
-    for day in value:
-        if not isinstance(day, int) or day < 1 or day > 365:
-            raise ValidationError(
-                "Each reminder day must be an integer between 1 and 365."
-            )
+# validate_reminder_days is imported here too because migration 0002
+# references it as trades.models.validate_reminder_days.
+from .daylists import (  # noqa: F401
+    MAX_DAY,
+    days_left_to_days_since,
+    validate_optional_reminder_days,
+    validate_reminder_days,
+)
 
 
 class ReminderSchedule(models.Model):
-    """Global configuration of the reminder day numbers.
+    """Site-wide default reminder days, as "days left before the deadline".
 
-    The ``day_list`` holds the numbers of days after the last trade on which
-    a reminder is sent. It is configurable interactively (keyboard input,
-    multiple values) through the ``set_reminder_days`` management command.
+    ``days_left`` holds day counts before an account's inactivity deadline on
+    which a reminder is sent (0 = the deadline day itself). Each account
+    converts them using its own ``inactivity_days`` limit, so one list works
+    for 14-, 21- and 30-day accounts. Users and accounts can override it.
+    Set it in the admin or with the ``set_reminder_days`` command.
     """
 
-    #: Default day numbers used if no schedule row exists yet. Day 30 (the
-    #: inactivity threshold itself) is included as the final, most urgent
-    #: reminder — see the day-vs-deadline comparison note on
-    #: TradingAccount.next_reminder_datetime and trades.tasks for why this
-    #: must be compared by calendar day, not by the exact deadline instant.
-    DEFAULT_DAYS = [10, 15, 25, 26, 27, 28, 29, 30]
+    #: Default if no schedule row exists yet. For a 30-day account this is
+    #: days 10, 15 and 25–30 after the last trade. 0 (the deadline day) is the
+    #: final, most urgent reminder — see the day-vs-deadline note in
+    #: trades.tasks.evaluate_account for why it is compared by calendar day.
+    DEFAULT_DAYS_LEFT = [20, 15, 5, 4, 3, 2, 1, 0]
 
-    day_list = models.JSONField(
+    days_left = models.JSONField(
         default=list,
         validators=[validate_reminder_days],
-        help_text="List of day numbers (after last trade) on which to send reminders.",
+        help_text="Days before the inactivity deadline on which to send reminders "
+        "(0 = deadline day), e.g. [20, 15, 5, 3, 1, 0].",
     )
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -45,19 +43,19 @@ class ReminderSchedule(models.Model):
         verbose_name_plural = "Reminder schedules"
 
     def __str__(self):
-        return ", ".join(str(d) for d in self.days())
+        return "Days left: " + ", ".join(str(d) for d in self.days_left_list())
 
     @classmethod
     def get(cls):
         """Return the first schedule row (unsaved default if none exists)."""
         obj = cls.objects.first()
         if obj is None:
-            obj = ReminderSchedule(day_list=ReminderSchedule.DEFAULT_DAYS)
+            obj = ReminderSchedule(days_left=list(ReminderSchedule.DEFAULT_DAYS_LEFT))
         return obj
 
-    def days(self):
-        """The reminder day numbers as a tuple (never empty)."""
-        return tuple(self.day_list or ReminderSchedule.DEFAULT_DAYS)
+    def days_left_list(self):
+        """The "days left" values as a tuple, largest first (never empty)."""
+        return tuple(sorted(self.days_left or ReminderSchedule.DEFAULT_DAYS_LEFT, reverse=True))
 
     def save(self, *args, **kwargs):
         # Keep the global schedule a singleton: saving a new row updates the
@@ -73,7 +71,9 @@ class ReminderSchedule(models.Model):
 class TradingAccount(models.Model):
     """A user's forex trading account being monitored for inactivity."""
 
-    INACTIVITY_THRESHOLD_DAYS = 30  # reminder target
+    #: Default inactivity limit (most prop firms close accounts after 30 days
+    #: without a trade; some use 14 or 21). Each account sets its own.
+    INACTIVITY_THRESHOLD_DAYS = 30
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -91,6 +91,16 @@ class TradingAccount(models.Model):
     notify_email = models.BooleanField(default=True)
     notify_whatsapp = models.BooleanField(default=False)
     notify_telegram = models.BooleanField(default=False)
+    inactivity_days = models.PositiveSmallIntegerField(
+        default=INACTIVITY_THRESHOLD_DAYS,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_DAY)],
+        help_text="Days without a trade after which your prop firm closes the account.",
+    )
+    #: Per-account override of the reminder days ("days left"); None = use the
+    #: owner's default, then the site-wide ReminderSchedule.
+    reminder_days_left = models.JSONField(
+        null=True, blank=True, validators=[validate_optional_reminder_days]
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -127,15 +137,28 @@ class TradingAccount(models.Model):
         self.last_trade_date = when or timezone.now()
         self.save(update_fields=["last_trade_date", "updated_at"])
 
-    @property
-    def reminder_days(self):
-        """Ordered day numbers (after last trade) on which to send reminders."""
-        return ReminderSchedule.get().days()
+    def reminder_days_left_values(self, global_days_left=None):
+        """Effective "days left" reminder values: this account's override, else
+        the owner's default, else the site-wide schedule (``global_days_left``
+        if given, to avoid a query per account), else the built-in default."""
+        if self.reminder_days_left:
+            return tuple(sorted(self.reminder_days_left, reverse=True))
+        if self.user.reminder_days_left:
+            return tuple(sorted(self.user.reminder_days_left, reverse=True))
+        if global_days_left is None:
+            global_days_left = ReminderSchedule.get().days_left_list()
+        return tuple(global_days_left)
+
+    def reminder_days(self, global_days_left=None):
+        """Days since the last trade on which reminders fire for this account."""
+        return days_left_to_days_since(
+            self.reminder_days_left_values(global_days_left), self.inactivity_days
+        )
 
     @property
     def days_remaining(self):
-        """Days left before reaching the 30-day inactivity threshold."""
-        return max(0, self.INACTIVITY_THRESHOLD_DAYS - self.days_since_last_trade)
+        """Days left before reaching this account's inactivity limit."""
+        return max(0, self.inactivity_days - self.days_since_last_trade)
 
     def next_reminder_datetime(self):
         """The next datetime a reminder will be sent (user's local time), or None.
@@ -154,7 +177,7 @@ class TradingAccount(models.Model):
         send_hours = sorted(set(getattr(settings, "REMINDER_SEND_HOURS", [9, 14])))
         if not send_hours:
             return None
-        schedule = sorted(self.reminder_days)
+        schedule = sorted(self.reminder_days())
         if not schedule:
             return None
 
@@ -184,7 +207,7 @@ class TradingAccount(models.Model):
         # calendar-date difference. Comparing a slot time against the exact
         # deadline would wrongly hide the day-30 reminder whenever the last
         # trade happened earlier in the day than the send hours.
-        if days_since in schedule and days_since <= self.INACTIVITY_THRESHOLD_DAYS:
+        if days_since in schedule and days_since <= self.inactivity_days:
             for hour in send_hours:
                 slot_dt = at_hour(today, hour)
                 if slot_dt <= now_local:
@@ -201,7 +224,7 @@ class TradingAccount(models.Model):
         future = [d for d in schedule if d > days_since]
         if future:
             next_day = min(future)
-            if next_day <= self.INACTIVITY_THRESHOLD_DAYS:
+            if next_day <= self.inactivity_days:
                 return at_hour(
                     today + timezone.timedelta(days=next_day - days_since), send_hours[0]
                 )
@@ -257,14 +280,12 @@ class TradingAccount(models.Model):
     @property
     def is_inactive(self):
         """True when the account has crossed the inactivity threshold."""
-        return self.days_since_last_trade >= self.INACTIVITY_THRESHOLD_DAYS
+        return self.days_since_last_trade >= self.inactivity_days
 
     @property
     def deadline(self):
-        """The datetime at which the account becomes inactive (last trade + 30 days)."""
-        return self.last_trade_date + timezone.timedelta(
-            days=self.INACTIVITY_THRESHOLD_DAYS
-        )
+        """When the account becomes inactive (last trade + its inactivity limit)."""
+        return self.last_trade_date + timezone.timedelta(days=self.inactivity_days)
 
     def deadline_iso(self):
         """JS-friendly ISO 8601 timestamp of the inactivity deadline."""

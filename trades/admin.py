@@ -16,6 +16,7 @@ class TradingAccountAdmin(admin.ModelAdmin):
         "user",
         "broker",
         "last_trade_date",
+        "inactivity_days",
         "notify_email",
         "notify_whatsapp",
         "notify_telegram",
@@ -39,7 +40,7 @@ class ReminderHistoryAdmin(admin.ModelAdmin):
 
 @admin.register(ReminderSchedule)
 class ReminderScheduleAdmin(admin.ModelAdmin):
-    list_display = ["id", "day_list", "updated_at"]
+    list_display = ["id", "days_left", "updated_at"]
 
 
 @admin.register(ReminderRun)

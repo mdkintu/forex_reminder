@@ -25,7 +25,7 @@ def fixed_send_hour(settings):
 @pytest.fixture
 def schedule():
     """A reminder schedule with a known, small set of day numbers."""
-    return ReminderSchedule.objects.create(day_list=[10, 15])
+    return ReminderSchedule.objects.create(days_left=[20, 15])
 
 
 @pytest.fixture
@@ -367,7 +367,7 @@ def test_task_marks_unconfigured_channel_skipped(user, schedule, mock_notifiers)
 @pytest.mark.django_db
 def test_task_skips_accounts_past_deadline(user, mock_notifiers):
     """No reminder once the account is genuinely past the 30-day threshold."""
-    ReminderSchedule.objects.create(day_list=[31])
+    ReminderSchedule.objects.create(days_left=[0])  # day 30 is the last reminder day
     TradingAccount.objects.create(
         user=user,
         account_name="Closed",
@@ -387,7 +387,7 @@ def test_task_sends_on_day_30_even_if_last_trade_was_earlier_today(
     than the send hour (this used to be silently skipped: the exact
     last_trade + 30 days deadline instant would already be in the past by
     the time the send hour arrived, even though today is still day 30)."""
-    ReminderSchedule.objects.create(day_list=[30])
+    ReminderSchedule.objects.create(days_left=[0])
     tz = user.get_timezone()
     now_local = timezone.localtime(timezone.now(), tz)
     settings.REMINDER_SEND_HOURS = [now_local.hour]
@@ -414,8 +414,8 @@ def test_task_sends_on_day_30_even_if_last_trade_was_earlier_today(
 @pytest.mark.django_db
 def test_schedule_save_updates_existing_row():
     """Saving a new ReminderSchedule updates the singleton instead of doing nothing."""
-    ReminderSchedule.objects.create(day_list=[10])
-    ReminderSchedule(day_list=[5, 6]).save()
+    ReminderSchedule.objects.create(days_left=[20])
+    ReminderSchedule(days_left=[5, 6]).save()
 
     assert ReminderSchedule.objects.count() == 1
-    assert ReminderSchedule.get().days() == (5, 6)
+    assert ReminderSchedule.get().days_left_list() == (6, 5)

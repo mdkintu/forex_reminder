@@ -134,7 +134,7 @@ def _handle_start(chat_id, token):
 
 def _status_line(account):
     if account.is_inactive:
-        return f"• {account.account_name}: ⛔ past the {account.INACTIVITY_THRESHOLD_DAYS}-day limit"
+        return f"• {account.account_name}: ⛔ past its {account.inactivity_days}-day limit"
     days = account.days_remaining
     plural = "day" if days == 1 else "days"
     return (

@@ -55,7 +55,7 @@ class TradingAccountDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["threshold"] = TradingAccount.INACTIVITY_THRESHOLD_DAYS
+        context["threshold"] = self.object.inactivity_days
         # JS-friendly ISO timestamp of the inactivity deadline
         context["deadline"] = self.object.deadline_iso()
         # Reminder history for this account, newest first.

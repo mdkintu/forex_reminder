@@ -99,7 +99,7 @@ def test_account_list_ordered_by_name(user):
 def test_next_reminder_is_next_schedule_day_after_recent_trade(user, settings):
     """A fresh account's next reminder is the first schedule day (e.g. 10)."""
     settings.REMINDER_SEND_HOURS = [9, 14]
-    ReminderSchedule.objects.create(day_list=[10, 15])
+    ReminderSchedule.objects.create(days_left=[20, 15])
     account = TradingAccount.objects.create(
         user=user, account_name="Fresh", last_trade_date=timezone.now()
     )
@@ -117,7 +117,7 @@ def test_next_reminder_is_next_schedule_day_after_recent_trade(user, settings):
 def test_next_reminder_none_when_inactive(user, settings):
     """No upcoming reminder once the account is past the schedule / inactive."""
     settings.REMINDER_SEND_HOURS = [9, 14]
-    ReminderSchedule.objects.create(day_list=[10, 15])
+    ReminderSchedule.objects.create(days_left=[20, 15])
     account = TradingAccount.objects.create(
         user=user,
         account_name="Inactive",
@@ -131,7 +131,7 @@ def test_next_reminder_none_when_inactive(user, settings):
 def test_next_reminder_label_not_empty_for_fresh(user, settings):
     """A fresh account yields a non-empty human-friendly label."""
     settings.REMINDER_SEND_HOURS = [9, 14]
-    ReminderSchedule.objects.create(day_list=[10, 15])
+    ReminderSchedule.objects.create(days_left=[20, 15])
     account = TradingAccount.objects.create(
         user=user, account_name="Fresh", last_trade_date=timezone.now()
     )

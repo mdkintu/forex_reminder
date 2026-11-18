@@ -42,7 +42,7 @@ def at_risk_accounts():
     result = []
     for account in TradingAccount.objects.select_related("user"):
         days_since = account.days_since_last_trade
-        if days_since > TradingAccount.INACTIVITY_THRESHOLD_DAYS:
+        if days_since > account.inactivity_days:
             continue
         days_left = account.days_remaining
         if days_left > AT_RISK_DAYS_LEFT:

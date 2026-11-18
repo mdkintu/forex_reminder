@@ -4,6 +4,8 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone as dj_timezone
 
+from trades.daylists import validate_optional_reminder_days
+
 
 class UserManager(BaseUserManager):
     """Manager for the custom email-based user model (no username)."""
@@ -62,6 +64,12 @@ class User(AbstractUser):
     # Used to compute "days since last trade" in the user's local timezone so
     # inactivity reminders land on the right day for global users.
     timezone = models.CharField(max_length=64, blank=True, default="UTC")
+    # The user's default reminder days ("days left before the deadline"),
+    # used by accounts without their own override. None = site default
+    # (trades.models.ReminderSchedule).
+    reminder_days_left = models.JSONField(
+        null=True, blank=True, validators=[validate_optional_reminder_days]
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []  # Email is already required via USERNAME_FIELD

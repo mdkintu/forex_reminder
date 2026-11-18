@@ -61,6 +61,30 @@
                     {% endfor %}
                 </div>
 
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-5">
+                        <label class="form-label" for="{{ form.inactivity_days.id_for_label }}">Inactivity limit (days)</label>
+                        {{ form.inactivity_days }}
+                        <datalist id="inactivity-presets">
+                            <option value="14"></option>
+                            <option value="21"></option>
+                            <option value="30"></option>
+                        </datalist>
+                        <div class="form-text">{{ form.inactivity_days.help_text }} Check your firm's rules (commonly 14, 21 or 30).</div>
+                        {% for error in form.inactivity_days.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <div class="col-sm-7">
+                        <label class="form-label" for="{{ form.reminder_days_left.id_for_label }}">{{ form.reminder_days_left.label }} <span class="text-secondary">(optional)</span></label>
+                        {{ form.reminder_days_left }}
+                        <div class="form-text">{{ form.reminder_days_left.help_text }}</div>
+                        {% for error in form.reminder_days_left.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
                 <fieldset class="mb-4">
                     <legend class="col-form-label fw-semibold small mb-2">Notification channels</legend>
                     <div class="form-check form-switch">
