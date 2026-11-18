@@ -52,7 +52,7 @@ Built with:
   via which channel.
 - Prop-firm awareness built in — the UI explains that firms close accounts
   inactive for ~30 days and that a single trade resets the inactivity counter.
-- Duplicate reminders are avoided: each account+day+channel+slot is recorded
+- Duplicate reminders are avoided: each account+cycle+day+channel+slot is recorded
   in `ReminderHistory` exactly once.
 - A custom Django admin for users, trading accounts, reminder history, and the
   global reminder schedule.
@@ -285,7 +285,8 @@ The core task is `check_and_send_reminders` in `trades/tasks.py`. It:
    `skipped`, not `sent`.
 5. Skips the later-in-day slot (e.g. the 2 PM one) if the user placed a trade
    **after** the earlier slot that day (they already reacted to the 9 AM one).
-6. Writes a `ReminderHistory` row for each account+day+channel+slot before
+6. Writes a `ReminderHistory` row for each account+cycle+day+channel+slot (cycle = the
+   `last_trade_date` it was sent for, so a new trade restarts the reminders) before
    sending, and marks it `sent` afterward. The database's unique constraint
    guarantees a reminder is never sent twice for the same slot.
 

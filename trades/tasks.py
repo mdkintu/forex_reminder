@@ -196,6 +196,7 @@ def check_and_send_reminders() -> int:
 
             already_sent = ReminderHistory.objects.filter(
                 account=account,
+                cycle_start=account.last_trade_date,
                 day_number=days_since,
                 channel=channel,
                 slot_hour=local_hour,
@@ -207,6 +208,7 @@ def check_and_send_reminders() -> int:
                 with transaction.atomic():
                     history = ReminderHistory.objects.create(
                         account=account,
+                        cycle_start=account.last_trade_date,
                         day_number=days_since,
                         channel=channel,
                         status="pending",

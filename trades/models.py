@@ -286,12 +286,17 @@ class ReminderHistory(models.Model):
     # The local hour (0-23) this reminder was intended for, so the two daily
     # delivery slots (e.g. 9 AM and 2 PM) are each recorded separately.
     slot_hour = models.PositiveSmallIntegerField(default=0)
+    # The account's last_trade_date when this reminder was sent, i.e. which
+    # inactivity cycle it belongs to. A new trade starts a new cycle, so its
+    # day-N reminders must not be blocked by the previous cycle's. NULL for
+    # rows from past cycles recorded before this field existed.
+    cycle_start = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["account", "day_number", "channel", "slot_hour"],
-                name="unique_reminder_per_account_day_channel_slot",
+                fields=["account", "cycle_start", "day_number", "channel", "slot_hour"],
+                name="unique_reminder_per_cycle_day_channel_slot",
             )
         ]
         ordering = ["-sent_at"]

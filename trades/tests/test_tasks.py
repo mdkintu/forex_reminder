@@ -135,6 +135,31 @@ def test_task_avoids_duplicates(user, schedule, mock_notifiers):
 
 
 @pytest.mark.django_db
+def test_task_sends_again_in_new_cycle(user, schedule, mock_notifiers):
+    """A new trade starts a new cycle: its day-N reminder must be sent again.
+
+    Regression: dedup was keyed on (account, day, channel, slot) only, so a
+    reminder sent in a previous cycle silently blocked the same day number in
+    every later cycle.
+    """
+    account = TradingAccount.objects.create(
+        user=user,
+        account_name="Two cycles",
+        last_trade_date=timezone.now() - timedelta(days=10),
+        notify_email=True,
+    )
+    assert tasks.check_and_send_reminders() == 1
+
+    # The user traded again; 10 days later they are on day 10 of a new cycle.
+    # (Shift the existing row's cycle into the past to mimic elapsed time.)
+    account.last_trade_date = timezone.now() - timedelta(days=10, minutes=-5)
+    account.save()
+
+    assert tasks.check_and_send_reminders() == 1
+    assert ReminderHistory.objects.filter(account=account, day_number=10).count() == 2
+
+
+@pytest.mark.django_db
 def test_task_sends_for_multiple_different_dates(user, schedule, mock_notifiers):
     """Accounts with different last_trade_dates are handled correctly."""
     TradingAccount.objects.create(
