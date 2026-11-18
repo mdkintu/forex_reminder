@@ -241,3 +241,34 @@ def test_healthcheck_errors_never_raise(settings):
     settings.HEALTHCHECK_PING_URL = "https://hc.example/abc"
     with mock.patch.object(reporting, "urlopen", side_effect=OSError("no network")):
         assert reporting.ping_healthcheck() is False
+
+
+@pytest.fixture
+def superuser(db):
+    from accounts.models import User
+
+    return User.objects.create_superuser(
+        email="boss@example.com", password="x-pass-123456", telegram_chat_id="777"
+    )
+
+
+@pytest.mark.django_db
+def test_report_uses_superuser_telegram_without_setting(user, mock_notifiers, superuser, settings):
+    settings.ADMIN_TELEGRAM_CHAT_ID = ""
+    settings.ADMIN_REPORT_HOUR = 0
+    tasks.run_reminders()
+    with mock.patch.object(reporting, "send_telegram_message") as send:
+        assert reporting.maybe_send_daily_report() is True
+    assert send.call_args.args[0] == "777"
+
+
+@pytest.mark.django_db
+def test_report_emails_superuser_when_nothing_configured(user, mock_notifiers, superuser, settings):
+    superuser.telegram_chat_id = ""
+    superuser.save()
+    settings.ADMIN_TELEGRAM_CHAT_ID = ""
+    settings.ADMINS = []
+    settings.ADMIN_REPORT_HOUR = 0
+    tasks.run_reminders()
+    assert reporting.maybe_send_daily_report() is True
+    assert mail.outbox[-1].to == ["boss@example.com"]

@@ -16,7 +16,7 @@ from datetime import timedelta
 from urllib.request import urlopen
 
 from django.conf import settings
-from django.core.mail import mail_admins
+from django.core.mail import send_mail
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -99,13 +99,37 @@ def build_daily_report(now=None) -> str:
     return "\n".join(lines)
 
 
+def report_recipients():
+    """Who gets the daily report, reusing what is already set up.
+
+    Returns ``(telegram_chat_ids, emails)``; only one of them is used:
+
+    1. ``ADMIN_TELEGRAM_CHAT_ID`` if set, else the connected Telegram chats of
+       active superusers (no extra configuration needed);
+    2. otherwise email: ``ADMINS`` (ADMIN_EMAILS) if set, else the active
+       superusers' own email addresses.
+    """
+    from django.contrib.auth import get_user_model
+
+    configured = getattr(settings, "ADMIN_TELEGRAM_CHAT_ID", "")
+    if configured:
+        return [configured], []
+    superusers = get_user_model().objects.filter(is_superuser=True, is_active=True)
+    chats = [c for c in superusers.values_list("telegram_chat_id", flat=True) if c]
+    if chats:
+        return sorted(set(chats)), []
+    admins = [email for _, email in getattr(settings, "ADMINS", [])]
+    if admins:
+        return [], admins
+    return [], [e for e in superusers.values_list("email", flat=True) if e]
+
+
 def maybe_send_daily_report(now=None) -> bool:
     """Send the daily admin report if it's due. Returns True if it was sent.
 
     Due once per UTC day, on the first run at or after
-    ``settings.ADMIN_REPORT_HOUR``. Sent to ``ADMIN_TELEGRAM_CHAT_ID`` when set,
-    otherwise emailed to ``ADMINS``. If sending fails, nothing is marked, so
-    the next hourly run tries again.
+    ``settings.ADMIN_REPORT_HOUR``, to :func:`report_recipients`. If sending
+    fails, nothing is marked, so the next hourly run tries again.
     """
     now = now or timezone.now()
     if now.hour < getattr(settings, "ADMIN_REPORT_HOUR", 6):
@@ -119,28 +143,29 @@ def maybe_send_daily_report(now=None) -> bool:
     if last_run is None:
         return False  # nothing to report on (and nowhere to mark it sent)
 
-    chat_id = getattr(settings, "ADMIN_TELEGRAM_CHAT_ID", "")
-    if not chat_id and not getattr(settings, "ADMINS", None):
+    chats, emails = report_recipients()
+    if not chats and not emails:
         logger.warning(
-            "[report] No ADMIN_TELEGRAM_CHAT_ID or ADMINS configured; "
-            "daily report not sent."
+            "[report] No recipient: connect Telegram on a superuser's profile, "
+            "or set ADMIN_TELEGRAM_CHAT_ID / ADMIN_EMAILS. Daily report not sent."
         )
         return False
 
     text = build_daily_report(now)
     try:
-        if chat_id:
-            if not send_telegram_message(chat_id, text):
+        if chats:
+            delivered = [chat for chat in chats if send_telegram_message(chat, text)]
+            if not delivered:
                 raise RuntimeError("Telegram not configured (TELEGRAM_BOT_TOKEN)")
         else:
-            mail_admins("FAIR daily report", text, fail_silently=False)
+            send_mail("FAIR daily report", text, settings.DEFAULT_FROM_EMAIL, emails)
     except Exception:  # noqa: BLE001 - monitoring must never break the job
         logger.exception("[report] Failed to send the daily report; will retry next run.")
         return False
 
     last_run.report_sent = True
     last_run.save(update_fields=["report_sent"])
-    logger.info("[report] Daily report sent.")
+    logger.info("[report] Daily report sent to %s.", ", ".join(chats or emails))
     return True
 
 

@@ -21,9 +21,9 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - `send_reminders --dry-run`: per-account decision + reason, sends nothing.
 - `trades.tasks.evaluate_account()` (pure decision) / `run_reminders()` (returns `RunSummary`); `check_and_send_reminders()` is a thin Celery wrapper.
 - `ReminderRun` model logs every real run (read-only in admin).
-- `trades/reporting.py`: daily admin report (Telegram `ADMIN_TELEGRAM_CHAT_ID`, fallback `ADMIN_EMAILS`) flagging accounts ≤3 days from deadline with nothing delivered; `HEALTHCHECK_PING_URL` ping after each run.
+- `trades/reporting.py`: daily admin report (to superusers' connected Telegram chats by default; `ADMIN_TELEGRAM_CHAT_ID`/`ADMIN_EMAILS` optional overrides) flagging accounts ≤3 days from deadline with nothing delivered; `HEALTHCHECK_PING_URL` ping after each run.
 - `LOGGING`: timestamped INFO logs for `trades`/`accounts` → `reminders.log`.
-- **Deploy:** `git pull`, `migrate` (0006), add `ADMIN_TELEGRAM_CHAT_ID=<your chat id>` (and optionally `HEALTHCHECK_PING_URL`) to `.env`, restart. Check: `python manage.py send_reminders --dry-run`.
+- **Deploy:** `git pull`, `migrate` (0006), optionally add `HEALTHCHECK_PING_URL` to `.env`, restart. (No admin chat setting needed: the report goes to superusers' connected Telegram.) Check: `python manage.py send_reminders --dry-run`.
 
 ### Phase 2: one-tap "I traded" ✅ (deploy pending)
 - `TradingAccount.mark_traded()`; dashboard + detail "I traded" button (`trades:mark_traded`, POST, owner only).
@@ -56,7 +56,7 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - **Deploy:** `git pull`, `migrate` (accounts 0007, trades 0009), restart.
 
 ### Deploy everything at once (phases 1–5)
-`git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, add `ADMIN_TELEGRAM_CHAT_ID` (and optionally `HEALTHCHECK_PING_URL`) to `.env`, remove the duplicate `EMAIL_BACKEND` line, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
+`git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, optionally add `HEALTHCHECK_PING_URL` to `.env`, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
 
 ---
 

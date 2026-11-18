@@ -293,9 +293,10 @@ TELEGRAM_WEBHOOK_SECRET = config("TELEGRAM_WEBHOOK_SECRET", default="")
 # ----------------------------------------------------------------------------
 # Monitoring (see trades/reporting.py)
 # ----------------------------------------------------------------------------
-# Telegram chat id that receives the once-a-day health report of the reminder
-# job (find yours as `telegram_chat_id` on your own user in the admin). If
-# empty, the report is emailed to ADMINS instead.
+# Optional. Telegram chat that receives the once-a-day health report of the
+# reminder job. If empty, the report goes to every active superuser's
+# connected Telegram chat; failing that, by email to ADMINS (ADMIN_EMAILS),
+# else to the superusers' own emails. See trades.reporting.report_recipients.
 ADMIN_TELEGRAM_CHAT_ID = config("ADMIN_TELEGRAM_CHAT_ID", default="")
 # UTC hour from which the daily report is sent (first cron run at/after it).
 ADMIN_REPORT_HOUR = config("ADMIN_REPORT_HOUR", default=6, cast=int)

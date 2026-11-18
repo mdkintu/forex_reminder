@@ -183,7 +183,8 @@ Every real run is also:
 - **logged** with timestamps (one line per account) to the cron log;
 - **recorded** as a *Reminder run* in the admin (checked / sent / skipped / failed);
 - followed, once a day after `ADMIN_REPORT_HOUR` UTC, by a **daily admin report**
-  to `ADMIN_TELEGRAM_CHAT_ID` (or `ADMIN_EMAILS`). It lists the runs of the last
+  to every superuser's connected Telegram chat (no setup needed; override with
+  `ADMIN_TELEGRAM_CHAT_ID`), or by email if none is connected. It lists the runs of the last
   24 h and flags any account within 3 days of its deadline that has had **no
   reminder delivered** this cycle;
 - followed by a ping to `HEALTHCHECK_PING_URL`, if set. Create a free check at
@@ -272,8 +273,8 @@ sensible development defaults, so you only need to set what you actually use.
 | `TELEGRAM_BOT_TOKEN`     | *(empty)*                       | Telegram bot token |
 | `TELEGRAM_BOT_USERNAME`  | *(empty)*                       | Bot's public @username (no `@`) — powers the "Connect Telegram" deep link |
 | `TELEGRAM_WEBHOOK_SECRET`| *(empty)*                       | Random secret verifying incoming Telegram webhook calls |
-| `ADMIN_TELEGRAM_CHAT_ID` | *(empty)*                       | Telegram chat id that gets the daily health report of the reminder job |
-| `ADMIN_EMAILS`           | *(empty)*                       | Comma-separated emails; report fallback when no admin chat id is set |
+| `ADMIN_TELEGRAM_CHAT_ID` | *(empty)*                       | Optional override for where the daily report goes (default: superusers' connected Telegram chats) |
+| `ADMIN_EMAILS`           | *(empty)*                       | Email fallback when no superuser has Telegram connected (default: superusers' emails) |
 | `ADMIN_REPORT_HOUR`      | `6`                             | UTC hour from which the daily report is sent |
 | `HEALTHCHECK_PING_URL`   | *(empty)*                       | Optional dead-man's-switch URL (e.g. healthchecks.io) pinged after every run |
 
