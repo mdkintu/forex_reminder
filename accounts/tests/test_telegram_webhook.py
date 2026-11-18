@@ -18,7 +18,7 @@ def webhook_secret(settings):
 
 @pytest.fixture
 def mock_send_telegram():
-    with mock.patch("accounts.views.send_telegram_message") as sender:
+    with mock.patch("accounts.telegram_bot.send_telegram_message") as sender:
         yield sender
 
 

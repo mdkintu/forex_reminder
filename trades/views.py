@@ -1,8 +1,13 @@
 from datetime import time
 
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -13,6 +18,7 @@ from django.views.generic import (
 
 from .forms import TradingAccountForm
 from .models import TradingAccount
+from .tokens import read_traded_token
 
 
 def _send_hours_label() -> str:
@@ -96,3 +102,36 @@ class TradingAccountDeleteView(LoginRequiredMixin, DeleteView):
     def get_queryset(self):
         return TradingAccount.objects.filter(user=self.request.user)
 
+
+
+@login_required
+@require_POST
+def mark_traded(request, pk):
+    """The "I traded now" button on the dashboard / account page."""
+    account = get_object_or_404(TradingAccount, pk=pk, user=request.user)
+    account.mark_traded()
+    messages.success(
+        request,
+        f"Countdown reset for '{account.account_name}'. Next reminder: "
+        f"{account.next_reminder_label}.",
+    )
+    next_url = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = account.get_absolute_url()
+    return redirect(next_url)
+
+
+def traded_link(request, token):
+    """One-click "I traded" link from a reminder email (no login needed).
+
+    GET shows a confirmation button and changes nothing (email scanners
+    pre-fetch links); POST records the trade.
+    """
+    account = read_traded_token(token)
+    done = False
+    if account is not None and request.method == "POST":
+        account.mark_traded()
+        done = True
+    return render(request, "traded_confirm.html", {"account": account, "done": done})

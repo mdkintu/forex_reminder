@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}I traded — FAIR{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 560px;">
+    <div class="card shadow-sm">
+        <div class="card-body p-4 text-center">
+            {% if account is None %}
+                <h1 class="h4 mb-3">This link has expired</h1>
+                <p class="text-secondary">
+                    "I traded" links from reminder emails work for 7 days. Log in to
+                    reset the countdown from your dashboard instead.
+                </p>
+                <a href="{% url 'accounts:dashboard' %}" class="btn btn-primary">Go to dashboard</a>
+            {% elif done %}
+                <h1 class="h4 mb-3">✅ Countdown reset</h1>
+                <p class="mb-1"><strong>{{ account.account_name }}</strong>{% if account.account_number %} (#{{ account.account_number }}){% endif %}</p>
+                <p class="text-secondary">
+                    Last trade recorded as now. Next reminder: {{ account.next_reminder_label }}.
+                </p>
+                <a href="{% url 'accounts:dashboard' %}" class="btn btn-outline-primary">Open dashboard</a>
+            {% else %}
+                <h1 class="h4 mb-3">Did you just trade?</h1>
+                <p class="mb-1"><strong>{{ account.account_name }}</strong>{% if account.account_number %} (#{{ account.account_number }}){% endif %}</p>
+                <p class="text-secondary">
+                    Confirm to record a trade now and restart this account's
+                    {{ account.INACTIVITY_THRESHOLD_DAYS }}-day inactivity countdown.
+                </p>
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success btn-lg">✅ Yes, I traded</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

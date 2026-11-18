@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from .models import ReminderHistory, ReminderRun, ReminderSchedule, TradingAccount
 from .notifications import send_telegram_message, send_whatsapp_message
+from .tokens import traded_url
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ def _send_email(account, day_number):
         f"{day_number} days.\n\n"
         f"Last trade was on {account.last_trade_date:%Y-%m-%d %H:%M}.\n\n"
         f"Please place a trade to keep the account active, or contact your broker.\n\n"
+        f"Already traded? Reset the countdown in one click:\n{traded_url(account)}\n\n"
         f"— Forex Account Inactivity Reminder (FAIR)"
     )
     return send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [account.user.email])
@@ -76,7 +78,11 @@ def _send_telegram(account, day_number):
         f"broker: {account.broker or 'unknown'}) has had no trade for "
         f"{day_number} days. Please place a trade to keep it active."
     )
-    return send_telegram_message(account.user.telegram_chat_id, text)
+    return send_telegram_message(
+        account.user.telegram_chat_id,
+        text,
+        buttons=[[("✅ I traded", f"traded:{account.pk}")]],
+    )
 
 
 SENDERS = {

@@ -71,6 +71,19 @@ class Command(BaseCommand):
         url = f"{settings.SITE_SCHEME}://{settings.SITE_DOMAIN}{path}"
 
         asyncio.run(
-            bot.set_webhook(url=url, secret_token=settings.TELEGRAM_WEBHOOK_SECRET)
+            bot.set_webhook(
+                url=url,
+                secret_token=settings.TELEGRAM_WEBHOOK_SECRET,
+                # Messages (/start, /status, /traded…) and inline-button taps.
+                allowed_updates=["message", "callback_query"],
+            )
         )
         self.stdout.write(self.style.SUCCESS(f"Webhook registered: {url}"))
+
+        # The "/" command menu users see in Telegram.
+        from accounts.telegram_bot import COMMANDS
+
+        asyncio.run(
+            bot.set_my_commands([telegram.BotCommand(name, desc) for name, desc in COMMANDS])
+        )
+        self.stdout.write(self.style.SUCCESS("Bot command menu set: " + ", ".join(f"/{n}" for n, _ in COMMANDS)))

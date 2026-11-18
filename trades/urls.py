@@ -10,4 +10,6 @@ urlpatterns = [
     path("<int:pk>/", views.TradingAccountDetailView.as_view(), name="detail"),
     path("<int:pk>/edit/", views.TradingAccountUpdateView.as_view(), name="edit"),
     path("<int:pk>/delete/", views.TradingAccountDeleteView.as_view(), name="delete"),
+    path("<int:pk>/traded/", views.mark_traded, name="mark_traded"),
+    path("traded/<str:token>/", views.traded_link, name="traded_link"),
 ]

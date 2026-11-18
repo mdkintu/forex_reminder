@@ -11,10 +11,9 @@ from django.views.decorators.http import require_POST
 
 from allauth.account.models import EmailAddress
 from trades.models import TradingAccount
-from trades.notifications import send_telegram_message
 
+from . import telegram_bot
 from .forms import ProfileForm
-from .models import User
 
 logger = logging.getLogger(__name__)
 
@@ -143,11 +142,9 @@ def profile(request):
 @require_POST
 def telegram_webhook(request):
     """Receives updates from Telegram's webhook (see the set_telegram_webhook
-    management command).
+    management command) and hands them to :mod:`accounts.telegram_bot`.
 
-    Handles the ``/start <token>`` message the "Connect Telegram" deep link
-    sends: resolves which user the token belongs to, saves their chat id so
-    reminders can reach them, and confirms in the chat. Always returns 200
+    Verifies the shared secret header. Always returns 200 to genuine calls
     (Telegram retries on non-2xx) — problems are logged, not raised.
     """
     secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
@@ -160,45 +157,8 @@ def telegram_webhook(request):
         logger.warning("[telegram webhook] Ignoring malformed update body.")
         return HttpResponse(status=200)
 
-    message = update.get("message") or update.get("edited_message") or {}
-    chat_id = message.get("chat", {}).get("id")
-    text = (message.get("text") or "").strip()
-
-    if not chat_id or not text.startswith("/start"):
-        return HttpResponse(status=200)
-
-    token = text[len("/start"):].strip()
-    user = User.resolve_telegram_link_token(token)
-
-    if user is None:
-        _try_send_telegram(
-            chat_id,
-            "This link has expired or isn't valid. Go back to your FAIR "
-            "profile page and tap “Connect Telegram” again.",
-        )
-        return HttpResponse(status=200)
-
-    # Save first: the connection itself must not be lost even if the
-    # confirmation reply below fails to send (network blip, Telegram API
-    # error, etc.) — a retried webhook delivery would otherwise find the
-    # token already cleared and wrongly report it as expired.
-    user.telegram_chat_id = str(chat_id)
-    user.save(update_fields=["telegram_chat_id"])
-    user.clear_telegram_link_token()
-
-    logger.info("[telegram webhook] Connected chat %s to user %s.", chat_id, user.email)
-    _try_send_telegram(
-        chat_id,
-        "✅ Telegram connected! You'll receive FAIR inactivity reminders here.",
-    )
-    return HttpResponse(status=200)
-
-
-def _try_send_telegram(chat_id, text) -> None:
-    """send_telegram_message, but never raise — a failed reply here must not
-    turn into a 500 back to Telegram (which would just retry the update)."""
     try:
-        send_telegram_message(chat_id, text)
-    except Exception:  # noqa: BLE001 - log and continue, see docstring
-        logger.exception("[telegram webhook] Failed to reply to chat %s.", chat_id)
-
+        telegram_bot.handle_update(update if isinstance(update, dict) else {})
+    except Exception:  # noqa: BLE001 - never 500 back to Telegram
+        logger.exception("[telegram webhook] Failed to handle update %s.", update.get("update_id") if isinstance(update, dict) else "?")
+    return HttpResponse(status=200)

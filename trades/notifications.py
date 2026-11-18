@@ -66,25 +66,9 @@ def send_whatsapp_message(to: str, body: str) -> str | None:
     return message.sid
 
 
-def send_telegram_message(chat_id: str | int, text: str) -> object | None:
-    """Send a Telegram message to ``chat_id`` via the configured bot.
-
-    Args:
-        chat_id: The recipient's Telegram chat id (str or int).
-        text:    Message text.
-
-    Returns:
-        The telegram ``Message`` object on success, or ``None`` if not
-        configured / skipped.
-    """
-    bot_token = settings.TELEGRAM_BOT_TOKEN
-
-    if not (bot_token and chat_id):
-        logger.warning(
-            "[notifications][telegram] Telegram not configured "
-            "(TELEGRAM_BOT_TOKEN) or chat_id '%s' missing. Skipping message.",
-            chat_id or "unknown",
-        )
+def _bot():
+    """A python-telegram-bot ``Bot`` with generous timeouts, or None if no token."""
+    if not settings.TELEGRAM_BOT_TOKEN:
         return None
 
     import telegram  # python-telegram-bot, lazy import
@@ -100,49 +84,101 @@ def send_telegram_message(chat_id: str | int, text: str) -> object | None:
         write_timeout=TELEGRAM_READ_TIMEOUT,
         pool_timeout=TELEGRAM_READ_TIMEOUT,
     )
+    return telegram.Bot(token=settings.TELEGRAM_BOT_TOKEN, request=request)
 
-    bot = telegram.Bot(token=bot_token, request=request)
 
-    # send_message is async in python-telegram-bot v20+; run it via asyncio.
-    async def _send() -> object:
+def _run_bot(call):
+    """Run ``await call(bot)`` synchronously, retrying on timeouts.
+
+    The bot API is async in python-telegram-bot v20+. From plain sync code
+    (cron, views) we use ``asyncio.run``; if an event loop is already running
+    in this thread, the call runs on a fresh loop in a worker thread instead.
+    Returns None when Telegram isn't configured.
+    """
+    bot = _bot()
+    if bot is None:
+        return None
+
+    import telegram
+
+    async def _with_retries():
         for attempt in range(1, TELEGRAM_MAX_ATTEMPTS + 1):
             try:
-                return await bot.send_message(chat_id=chat_id, text=text)
+                return await call(bot)
             except telegram.error.TimedOut:
                 if attempt < TELEGRAM_MAX_ATTEMPTS:
                     logger.warning(
-                        "[notifications][telegram] Timed out on attempt %s/%s "
-                        "for chat %s; retrying.",
+                        "[notifications][telegram] Timed out on attempt %s/%s; retrying.",
                         attempt,
                         TELEGRAM_MAX_ATTEMPTS,
-                        chat_id,
                     )
                     await asyncio.sleep(2 * attempt)  # small backoff
                     continue
                 raise
 
     try:
-        async def _main():
-            return await _send()
-
-        result = asyncio.run(_main())
-        logger.info(
-            "[notifications][telegram] Sent to chat %s (msg id %s).",
-            chat_id,
-            getattr(result, "message_id", "?"),
-        )
-        return result
+        asyncio.get_running_loop()
     except RuntimeError:
-        # asyncio.run() refuses to start inside an already-running loop; run
-        # the send on a fresh loop in a worker thread instead.
-        from concurrent.futures import ThreadPoolExecutor
+        return asyncio.run(_with_retries())  # normal case: no loop running
 
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            result = pool.submit(asyncio.run, _send()).result()
-        logger.info(
-            "[notifications][telegram] Sent to chat %s (msg id %s).",
-            chat_id,
-            getattr(result, "message_id", "?"),
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, _with_retries()).result()
+
+
+def _keyboard(buttons):
+    """[[(label, callback_data), ...], ...] -> InlineKeyboardMarkup (or None)."""
+    if not buttons:
+        return None
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(label, callback_data=data) for label, data in row] for row in buttons]
+    )
+
+
+def send_telegram_message(chat_id: str | int, text: str, buttons=None) -> object | None:
+    """Send a Telegram message to ``chat_id`` via the configured bot.
+
+    Args:
+        chat_id: The recipient's Telegram chat id (str or int).
+        text:    Message text.
+        buttons: Optional inline keyboard as rows of ``(label, callback_data)``
+                 tuples, e.g. ``[[("✅ I traded", "traded:5")]]``.
+
+    Returns:
+        The telegram ``Message`` object on success, or ``None`` if not
+        configured / skipped.
+    """
+    if not (settings.TELEGRAM_BOT_TOKEN and chat_id):
+        logger.warning(
+            "[notifications][telegram] Telegram not configured "
+            "(TELEGRAM_BOT_TOKEN) or chat_id '%s' missing. Skipping message.",
+            chat_id or "unknown",
         )
-        return result
+        return None
 
+    result = _run_bot(
+        lambda bot: bot.send_message(chat_id=chat_id, text=text, reply_markup=_keyboard(buttons))
+    )
+    logger.info(
+        "[notifications][telegram] Sent to chat %s (msg id %s).",
+        chat_id,
+        getattr(result, "message_id", "?"),
+    )
+    return result
+
+
+def answer_callback_query(callback_query_id: str, text: str = "") -> object | None:
+    """Acknowledge an inline-button tap (stops the button's loading spinner)."""
+    return _run_bot(
+        lambda bot: bot.answer_callback_query(callback_query_id=callback_query_id, text=text or None)
+    )
+
+
+def edit_message_text(chat_id, message_id, text: str) -> object | None:
+    """Replace the text of a message the bot sent earlier (drops its buttons)."""
+    return _run_bot(
+        lambda bot: bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
+    )

@@ -95,6 +95,10 @@
             </div>
 
             <div class="d-flex gap-2 mt-3 flex-wrap">
+                <form method="post" action="{% url 'trades:mark_traded' account.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success" title="Record a trade now and restart the countdown">✅ I traded now</button>
+                </form>
                 <a href="{% url 'trades:edit' account.pk %}" class="btn btn-outline-primary">Edit</a>
                 <a href="{% url 'trades:delete' account.pk %}" class="btn btn-outline-danger">Delete</a>
                 <a href="{% url 'trades:list' %}" class="btn btn-outline-secondary ms-auto">Back to list</a>

@@ -293,6 +293,24 @@ python manage.py set_telegram_webhook --delete # unregister it
 Re-run `set_telegram_webhook` any time `SITE_DOMAIN`, `TELEGRAM_BOT_TOKEN`, or
 `TELEGRAM_WEBHOOK_SECRET` change.
 
+### Recording a trade in one tap
+
+Users don't have to open the edit form after every trade:
+
+- Every **Telegram reminder** has an **✅ I traded** button.
+- The bot understands **`/status`** (days left per account, most urgent first),
+  **`/traded`** (one account: marked at once; several: pick from buttons),
+  **`/traded <name or account #>`** and **`/help`**. Only the chat linked to a
+  user can see or change that user's accounts.
+- Every **reminder email** has a one-click link (valid 7 days, signed). It opens
+  a confirmation page; the trade is only recorded when the button there is
+  pressed, because mail scanners pre-fetch links.
+- The **dashboard** and each **account page** have an **I traded** button.
+
+All of them set the last trade to *now*, which starts a fresh reminder cycle.
+`set_telegram_webhook` also registers button taps (`callback_query`) and the
+bot's command menu, so **re-run it after upgrading**.
+
 ---
 
 ## The reminder task

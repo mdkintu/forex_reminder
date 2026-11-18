@@ -118,6 +118,15 @@ class TradingAccount(models.Model):
         )
         return max(0, (local_now.date() - local_last.date()).days)
 
+    def mark_traded(self, when=None):
+        """Record a trade now (or at ``when``), restarting the countdown.
+
+        Reminder de-duplication is per cycle (ReminderHistory.cycle_start), so
+        the new last_trade_date automatically starts a fresh reminder cycle.
+        """
+        self.last_trade_date = when or timezone.now()
+        self.save(update_fields=["last_trade_date", "updated_at"])
+
     @property
     def reminder_days(self):
         """Ordered day numbers (after last trade) on which to send reminders."""

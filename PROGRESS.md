@@ -25,6 +25,13 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - `LOGGING`: timestamped INFO logs for `trades`/`accounts` → `reminders.log`.
 - **Deploy:** `git pull`, `migrate` (0006), add `ADMIN_TELEGRAM_CHAT_ID=<your chat id>` (and optionally `HEALTHCHECK_PING_URL`) to `.env`, restart. Check: `python manage.py send_reminders --dry-run`.
 
+### Phase 2: one-tap "I traded" ✅ (deploy pending)
+- `TradingAccount.mark_traded()`; dashboard + detail "I traded" button (`trades:mark_traded`, POST, owner only).
+- Email reminders carry a signed 7-day link (`trades/tokens.py`, `trades:traded_link`): GET confirms, POST records.
+- `accounts/telegram_bot.py`: `/status`, `/traded [name|#]`, `/help`, `/start <token>`, and `traded:<pk>` button callbacks (owner's chat only). Telegram reminders have an "✅ I traded" button.
+- `trades/notifications.py`: shared `_run_bot` runner, `buttons=` on `send_telegram_message`, `answer_callback_query`, `edit_message_text`.
+- **Deploy:** `git pull`, restart, then **re-run `python manage.py set_telegram_webhook`** (registers callbacks + command menu). Test: send `/status` to the bot.
+
 ---
 
 ## Tech Stack
