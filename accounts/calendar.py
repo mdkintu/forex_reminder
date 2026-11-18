@@ -20,7 +20,7 @@ def _escape(text: str) -> str:
     return (
         str(text)
         .replace("\\", "\\\\")
-        .replace(";", "\;")
+        .replace(";", "\\;")
         .replace(",", "\\,")
         .replace("\r\n", "\\n")
         .replace("\n", "\\n")

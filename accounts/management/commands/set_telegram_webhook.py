@@ -70,20 +70,24 @@ class Command(BaseCommand):
         path = reverse("accounts:telegram_webhook")
         url = f"{settings.SITE_SCHEME}://{settings.SITE_DOMAIN}{path}"
 
-        asyncio.run(
-            bot.set_webhook(
-                url=url,
-                secret_token=settings.TELEGRAM_WEBHOOK_SECRET,
-                # Messages (/start, /status, /traded…) and inline-button taps.
-                allowed_updates=["message", "callback_query"],
-            )
-        )
-        self.stdout.write(self.style.SUCCESS(f"Webhook registered: {url}"))
-
-        # The "/" command menu users see in Telegram.
         from accounts.telegram_bot import COMMANDS
 
-        asyncio.run(
-            bot.set_my_commands([telegram.BotCommand(name, desc) for name, desc in COMMANDS])
-        )
+        # Both calls share ONE event loop: the bot's HTTP client is bound to
+        # the loop it first ran on, so a second asyncio.run() on the same Bot
+        # fails with "Event loop is closed".
+        async def register():
+            async with bot:
+                await bot.set_webhook(
+                    url=url,
+                    secret_token=settings.TELEGRAM_WEBHOOK_SECRET,
+                    # Messages (/start, /status, /traded…) and inline-button taps.
+                    allowed_updates=["message", "callback_query"],
+                )
+                # The "/" command menu users see in Telegram.
+                await bot.set_my_commands(
+                    [telegram.BotCommand(name, desc) for name, desc in COMMANDS]
+                )
+
+        asyncio.run(register())
+        self.stdout.write(self.style.SUCCESS(f"Webhook registered: {url}"))
         self.stdout.write(self.style.SUCCESS("Bot command menu set: " + ", ".join(f"/{n}" for n, _ in COMMANDS)))

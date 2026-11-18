@@ -244,3 +244,9 @@ def test_profile_form_hours(user):
 def test_profile_form_rejects_more_than_three_hours(user):
     form = ProfileForm(data=_profile_data(user, reminder_hours=["8", "12", "16", "20"]), instance=user)
     assert not form.is_valid() and "reminder_hours" in form.errors
+
+
+def test_calendar_escaping():
+    from accounts.calendar import _escape
+
+    assert _escape("a;b,c\\d\ne") == r"a\;b\,c\\d\n" + "e"
