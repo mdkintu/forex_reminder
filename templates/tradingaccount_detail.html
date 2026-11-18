@@ -101,6 +101,18 @@
                 </form>
                 <a href="{% url 'trades:edit' account.pk %}" class="btn btn-outline-primary">Edit</a>
                 <a href="{% url 'trades:delete' account.pk %}" class="btn btn-outline-danger">Delete</a>
+                <form method="post" action="{% url 'trades:snooze' account.pk %}" class="d-inline-flex gap-1">
+                    {% csrf_token %}
+                    {% if account.is_snoozed %}
+                        <span class="align-self-center small text-secondary">💤 Snoozed until {{ account.snoozed_until|date:"M j, H:i" }}</span>
+                        <button type="submit" name="days" value="0" class="btn btn-outline-secondary">Resume reminders</button>
+                    {% else %}
+                        <select name="days" class="form-select" aria-label="Snooze length" style="width: auto;">
+                            {% for d in snooze_choices %}<option value="{{ d }}">{{ d }} day{{ d|pluralize }}</option>{% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-outline-secondary" title="Pause reminders (the final one before the deadline still comes)">💤 Snooze</button>
+                    {% endif %}
+                </form>
                 <a href="{% url 'trades:list' %}" class="btn btn-outline-secondary ms-auto">Back to list</a>
             </div>
         </div>

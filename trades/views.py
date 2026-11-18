@@ -1,9 +1,9 @@
 from datetime import time
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -17,13 +17,13 @@ from django.views.generic import (
 )
 
 from .forms import TradingAccountForm
-from .models import TradingAccount
+from .models import SNOOZE_DAYS, TradingAccount
 from .tokens import read_traded_token
 
 
-def _send_hours_label() -> str:
-    """A human-friendly label for settings.REMINDER_SEND_HOURS, e.g. "9 AM / 2 PM"."""
-    hours = sorted(set(getattr(settings, "REMINDER_SEND_HOURS", [9, 14])))
+def _send_hours_label(user) -> str:
+    """A human-friendly label for the user's send hours, e.g. "9 AM / 2 PM"."""
+    hours = user.get_reminder_hours()
     return " / ".join(time(hour=h).strftime("%I %p").lstrip("0") for h in hours)
 
 
@@ -60,7 +60,8 @@ class TradingAccountDetailView(LoginRequiredMixin, DetailView):
         context["deadline"] = self.object.deadline_iso()
         # Reminder history for this account, newest first.
         context["reminder_history"] = self.object.reminders.order_by("-sent_at")
-        context["send_hours_label"] = _send_hours_label()
+        context["send_hours_label"] = _send_hours_label(self.request.user)
+        context["snooze_choices"] = SNOOZE_DAYS
         return context
 
 
@@ -135,3 +136,26 @@ def traded_link(request, token):
         account.mark_traded()
         done = True
     return render(request, "traded_confirm.html", {"account": account, "done": done})
+
+
+@login_required
+@require_POST
+def snooze(request, pk):
+    """Pause (or, with days=0, resume) reminders for one account."""
+    account = get_object_or_404(TradingAccount, pk=pk, user=request.user)
+    try:
+        days = int(request.POST.get("days", ""))
+    except ValueError:
+        days = -1
+    if days != 0 and days not in SNOOZE_DAYS:
+        return HttpResponseBadRequest("Invalid snooze length.")
+    account.snooze(days)
+    if days:
+        messages.success(
+            request,
+            f"Reminders for '{account.account_name}' snoozed for {days} day(s). "
+            "The final reminder before the deadline still comes through.",
+        )
+    else:
+        messages.success(request, f"Reminders for '{account.account_name}' resumed.")
+    return redirect(account.get_absolute_url())

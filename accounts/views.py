@@ -4,8 +4,9 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -16,6 +17,8 @@ from trades.notifications import send_telegram_message
 from trades.models import TradingAccount
 
 from . import telegram_bot
+from .calendar import build_ics
+from .models import User
 from .forms import ProfileForm
 
 logger = logging.getLogger(__name__)
@@ -51,7 +54,11 @@ def dashboard(request):
     # Auto-detect timezone from the browser (sent via ?tz=) when needed.
     _save_detected_timezone(request)
 
-    accounts = request.user.trading_accounts.order_by("last_trade_date")
+    # Most urgent first; accounts already past their deadline go last.
+    accounts = sorted(
+        request.user.trading_accounts.select_related("user"),
+        key=lambda a: (a.is_inactive, a.days_remaining, a.account_name.lower()),
+    )
     return render(
         request,
         "dashboard.html",
@@ -86,6 +93,15 @@ def profile(request):
     two stay in sync. A separate "disconnect_telegram" POST action (its own
     button, not part of ProfileForm) clears a connected Telegram chat.
     """
+    if request.method == "POST" and "regenerate_calendar" in request.POST:
+        request.user.regenerate_calendar_token()
+        messages.success(
+            request,
+            "New calendar link created. The old link no longer works — "
+            "re-subscribe in your calendar app with the new one.",
+        )
+        return redirect("accounts:profile")
+
     if request.method == "POST" and "disconnect_telegram" in request.POST:
         request.user.telegram_chat_id = ""
         request.user.save(update_fields=["telegram_chat_id"])
@@ -137,8 +153,22 @@ def profile(request):
             "form": form,
             "user": request.user,
             "telegram_connect_url": telegram_connect_url,
+            "calendar_url": request.build_absolute_uri(
+                reverse("accounts:calendar_feed", args=[request.user.get_or_create_calendar_token()])
+            ),
         },
     )
+
+
+def calendar_feed(request, token):
+    """Private .ics feed of the user's deadlines (the token is the secret)."""
+    user = User.objects.filter(calendar_token=token).first() if token else None
+    if user is None:
+        raise Http404("Unknown calendar link.")
+    response = HttpResponse(build_ics(user), content_type="text/calendar; charset=utf-8")
+    response["Content-Disposition"] = 'inline; filename="fair-deadlines.ics"'
+    response["Cache-Control"] = "private, max-age=900"
+    return response
 
 
 #: Seconds a user must wait between "Send me a test reminder" clicks.

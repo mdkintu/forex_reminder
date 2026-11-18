@@ -1,6 +1,6 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-18 | **Git SHA:** 0ecf9fb
+**Last updated:** 2026-11-18 | **Git SHA:** see `git log -1` (roadmap phases 1–5 done)
 
 ---
 
@@ -47,6 +47,16 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - Messages state days left before the account's own limit.
 - Profile "Send me a test reminder" (`accounts:test_reminder`, 5-min cooldown) reports per-channel success/error. Account page shows status, tries, error.
 - **Deploy:** `git pull`, `migrate` (trades 0008), restart. Then on the live site use **Send me a test reminder** to confirm SMTP works, and remove the duplicate `EMAIL_BACKEND` line from the server `.env`.
+
+### Phase 5: UX polish ✅ (deploy pending)
+- Dashboard sorted by urgency (`TradingAccount.urgency`: danger ≤3, warning ≤7, success; past deadline last), shows limit and snooze state.
+- `accounts/calendar.py`: private .ics feed (`accounts:calendar_feed`, `User.calendar_token`, regenerate on profile), alarms 3 days and 1 day before.
+- Snooze: `TradingAccount.snoozed_until`, `snooze(days)`, `is_snoozed()` (never with ≤1 day left), `trades:snooze` view, Telegram `snooze:<pk>:<days>` button; `mark_traded` clears it. `evaluate_account` reason `snoozed`; `next_reminder_datetime` skips snoozed slots (rewritten as the `_upcoming_slots` generator).
+- Per-user send hours: `User.reminder_hours` (≤3, profile checkboxes 06–22) via `User.get_reminder_hours()` in the task, next-reminder time and labels.
+- **Deploy:** `git pull`, `migrate` (accounts 0007, trades 0009), restart.
+
+### Deploy everything at once (phases 1–5)
+`git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, add `ADMIN_TELEGRAM_CHAT_ID` (and optionally `HEALTHCHECK_PING_URL`) to `.env`, remove the duplicate `EMAIL_BACKEND` line, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
 
 ---
 

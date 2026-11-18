@@ -89,7 +89,7 @@ def _send_telegram(account, day_number, missed=False):
     return send_telegram_message(
         account.user.telegram_chat_id,
         _chat_text(account, day_number, missed),
-        buttons=[[("✅ I traded", f"traded:{account.pk}")]],
+        buttons=[[("✅ I traded", f"traded:{account.pk}"), ("💤 Snooze 1 day", f"snooze:{account.pk}:1")]],
     )
 
 
@@ -163,6 +163,7 @@ NOT_REMINDER_DAY = "not_reminder_day"
 PAST_DEADLINE = "past_deadline"
 NO_SLOT_DUE = "no_slot_due"
 TRADED_SINCE_SLOT = "traded_since_slot"
+SNOOZED = "snoozed"
 
 
 @dataclass
@@ -227,6 +228,10 @@ def evaluate_account(account, reminder_days, send_hours, grace_hours, now=None) 
         if missed is None:
             return Decision(NOT_REMINDER_DAY, days_since)
         day, catch_up = missed, True
+
+    # The user paused reminders (never effective with one day or less left).
+    if account.is_snoozed(now):
+        return Decision(SNOOZED, day, catch_up=catch_up)
 
     # The delivery slot that is due now in the owner's local time (the
     # latest slot at or before the current hour, within the grace window).
@@ -382,12 +387,14 @@ def run_reminders(dry_run: bool = False) -> RunSummary:
     started_at = timezone.now()
     summary = RunSummary()
     global_days_left = ReminderSchedule.get().days_left_list()
-    send_hours = getattr(settings, "REMINDER_SEND_HOURS", [9, 14])
     grace_hours = getattr(settings, "REMINDER_GRACE_HOURS", 3)
 
     for account in TradingAccount.objects.select_related("user").all():
         decision = evaluate_account(
-            account, account.reminder_days(global_days_left), send_hours, grace_hours
+            account,
+            account.reminder_days(global_days_left),
+            account.user.get_reminder_hours(),  # the owner's hours, else the site's
+            grace_hours,
         )
         summary.checked += 1
         summary.reasons[decision.reason] += 1

@@ -57,6 +57,16 @@ Built with:
   in `ReminderHistory` exactly once.
 - A custom Django admin for users, trading accounts, reminder history, and the
   global reminder schedule.
+- **Dashboard sorted by urgency** (red ≤ 3 days left, amber ≤ 7, green
+  otherwise; accounts past their deadline last).
+- **Private calendar feed** (`/calendar/<token>.ics`, link on the profile page):
+  every account's deadline with alerts 3 days and 1 day before. It updates
+  when a trade is recorded; "Regenerate link" revokes the old URL.
+- **Snooze** an account's reminders for 1, 3 or 7 days (account page, or the
+  "💤 Snooze 1 day" button on Telegram reminders). The final reminder, with
+  one day or less left, always comes through. Recording a trade ends a snooze.
+- **Per-user reminder times**: up to 3 local hours on the profile page
+  (default `REMINDER_SEND_HOURS`, 9 AM and 2 PM).
 
 ---
 

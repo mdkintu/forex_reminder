@@ -68,6 +68,10 @@ class ReminderSchedule(models.Model):
         super().save(*args, **kwargs)
 
 
+#: Snooze lengths (days) offered in the UI and by the Telegram bot.
+SNOOZE_DAYS = (1, 3, 7)
+
+
 class TradingAccount(models.Model):
     """A user's forex trading account being monitored for inactivity."""
 
@@ -101,6 +105,8 @@ class TradingAccount(models.Model):
     reminder_days_left = models.JSONField(
         null=True, blank=True, validators=[validate_optional_reminder_days]
     )
+    #: Reminders are paused until this time (see is_snoozed).
+    snoozed_until = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -135,7 +141,8 @@ class TradingAccount(models.Model):
         the new last_trade_date automatically starts a fresh reminder cycle.
         """
         self.last_trade_date = when or timezone.now()
-        self.save(update_fields=["last_trade_date", "updated_at"])
+        self.snoozed_until = None
+        self.save(update_fields=["last_trade_date", "snoozed_until", "updated_at"])
 
     def reminder_days_left_values(self, global_days_left=None):
         """Effective "days left" reminder values: this account's override, else
@@ -160,77 +167,88 @@ class TradingAccount(models.Model):
         """Days left before reaching this account's inactivity limit."""
         return max(0, self.inactivity_days - self.days_since_last_trade)
 
-    def next_reminder_datetime(self):
-        """The next datetime a reminder will be sent (user's local time), or None.
+    def is_snoozed(self, now=None):
+        """True while a snooze is active and the account has more than one day
+        left (the final reminders always go out, snoozed or not)."""
+        if not self.snoozed_until:
+            return False
+        return (now or timezone.now()) < self.snoozed_until and self.days_remaining > 1
 
-        Algorithm (per the delivery rules):
-        * On a schedule day a reminder goes out at each configured local hour
-          (normally 09:00 and 14:00), but a later-in-day slot is skipped if the
-          user placed a trade after the previous slot that day.
-        * If today is a schedule day and a send hour is still ahead, that is the
-          next reminder.
-        * Otherwise the next reminder is the next upcoming schedule day at its
-          first send hour.
-        * Returns None when there is no upcoming reminder (e.g. the account is
-          already inactive / past the schedule).
-        """
-        send_hours = sorted(set(getattr(settings, "REMINDER_SEND_HOURS", [9, 14])))
-        if not send_hours:
-            return None
-        schedule = sorted(self.reminder_days())
-        if not schedule:
-            return None
+    def snooze(self, days):
+        """Pause reminders for ``days`` days (0 cancels). Never silences the
+        last day before the deadline — see :meth:`is_snoozed`."""
+        self.snoozed_until = timezone.now() + timezone.timedelta(days=days) if days else None
+        self.save(update_fields=["snoozed_until", "updated_at"])
 
+    def _upcoming_slots(self, schedule, send_hours):
+        """Yield ``(slot datetime, days since last trade on that day)`` for every
+        future reminder slot, in time order, applying the delivery rules."""
         tz = self.user.get_timezone()
         now_local = timezone.localtime(timezone.now(), tz)
         days_since = self.days_since_last_trade
         today = now_local.date()
 
+        def at_hour(d, hour):
+            return timezone.make_aware(timezone.datetime(d.year, d.month, d.day, hour, 0, 0), tz)
+
         def traded_after(previous_hour):
             """True if the user last traded after `previous_hour` today (local)."""
-            prev_dt = now_local.replace(
-                hour=previous_hour, minute=0, second=0, microsecond=0
-            )
+            prev_dt = now_local.replace(hour=previous_hour, minute=0, second=0, microsecond=0)
             return timezone.localtime(self.last_trade_date, tz) > prev_dt
 
-        # Helper to build a send datetime for a given date + hour.
-        def at_hour(d, hour):
-            return timezone.make_aware(
-                timezone.datetime(d.year, d.month, d.day, hour, 0, 0),
-                tz,
-            )
-
-        # Case 1: today is a schedule day -> next slot today, if any.
         # Compared by calendar day (days_since), not the exact deadline
-        # instant: deadline is last_trade_date + 30 days to the second, tied
+        # instant: the deadline is last_trade_date + limit to the second, tied
         # to the original trade's time-of-day, while days_since is a plain
         # calendar-date difference. Comparing a slot time against the exact
-        # deadline would wrongly hide the day-30 reminder whenever the last
-        # trade happened earlier in the day than the send hours.
-        if days_since in schedule and days_since <= self.inactivity_days:
+        # deadline would wrongly hide the deadline-day reminder whenever the
+        # last trade happened earlier in the day than the send hours.
+        for day in schedule:
+            if day < days_since or day > self.inactivity_days:
+                continue
+            date = today + timezone.timedelta(days=day - days_since)
             for hour in send_hours:
-                slot_dt = at_hour(today, hour)
+                slot_dt = at_hour(date, hour)
                 if slot_dt <= now_local:
                     continue
-                # Skip the slot only if a prior slot fired and the user traded
-                # since that prior slot (later-in-day skip rule).
-                prior = [h for h in send_hours if h < hour]
-                if prior and traded_after(max(prior)):
-                    continue
-                return slot_dt
-            # All today's slots are past -> fall through to next schedule day.
+                if day == days_since:
+                    # Later-in-day skip rule: skip a slot if a prior slot
+                    # fired today and the user traded since that prior slot.
+                    prior = [h for h in send_hours if h < hour]
+                    if prior and traded_after(max(prior)):
+                        continue
+                yield slot_dt, day
 
-        # Case 2: find the next schedule day strictly greater than today.
-        future = [d for d in schedule if d > days_since]
-        if future:
-            next_day = min(future)
-            if next_day <= self.inactivity_days:
-                return at_hour(
-                    today + timezone.timedelta(days=next_day - days_since), send_hours[0]
-                )
+    def next_reminder_datetime(self):
+        """The next datetime a reminder will be sent (user's local time), or None.
 
-        # No next schedule day (e.g. past the last mark / inactive).
+        On a schedule day a reminder goes out at each of the user's send hours
+        (normally 09:00 and 14:00; see User.get_reminder_hours), except a
+        later-in-day slot when the user traded after the previous slot. Slots
+        inside an active snooze are skipped unless only one day (or less)
+        would be left. Returns None when there is no upcoming reminder (e.g.
+        the account is past its deadline or the schedule).
+        """
+        send_hours = self.user.get_reminder_hours()
+        schedule = sorted(self.reminder_days())
+        if not send_hours or not schedule:
+            return None
+        for slot_dt, day in self._upcoming_slots(schedule, send_hours):
+            snoozed = self.snoozed_until and slot_dt < self.snoozed_until
+            if snoozed and self.inactivity_days - day > 1:
+                continue
+            return slot_dt
         return None
+
+    @property
+    def urgency(self):
+        """Bootstrap colour for how close the deadline is."""
+        if self.is_inactive:
+            return "secondary"
+        if self.days_remaining <= 3:
+            return "danger"
+        if self.days_remaining <= 7:
+            return "warning"
+        return "success"
 
     @property
     def time_until_next_reminder(self):

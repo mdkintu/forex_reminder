@@ -9,8 +9,9 @@ Supported:
   an unambiguous match) it's marked immediately; otherwise the bot replies
   with one button per account.
 * ``/help``.
-* Inline-button taps (``callback_query``) with data ``traded:<account pk>`` —
-  sent on every Telegram reminder and by ``/traded``.
+* Inline-button taps (``callback_query``): ``traded:<account pk>`` (sent on
+  every Telegram reminder and by ``/traded``) and ``snooze:<pk>:<days>``
+  (the reminder's "Snooze 1 day" button).
 
 Only chats linked to a FAIR user can see or change that user's accounts.
 Plain (non-command) messages are ignored. :func:`handle_update` is called by
@@ -21,7 +22,7 @@ import logging
 
 from django.utils import timezone
 
-from trades.models import TradingAccount
+from trades.models import SNOOZE_DAYS, TradingAccount
 from trades.notifications import (
     answer_callback_query,
     edit_message_text,
@@ -199,9 +200,10 @@ def _handle_callback(query):
     message = query.get("message") or {}
     chat_id = message.get("chat", {}).get("id") or query.get("from", {}).get("id")
 
-    action, _, pk = data.partition(":")
+    action, *params = data.split(":")
+    pk = params[0] if params else ""
     account = None
-    if action == "traded" and pk.isdigit() and chat_id:
+    if action in ("traded", "snooze") and pk.isdigit() and chat_id:
         # Only the owner's linked chat may act on the account.
         account = (
             TradingAccount.objects.select_related("user")
@@ -209,13 +211,23 @@ def _handle_callback(query):
             .first()
         )
 
-    if account is None:
+    days = int(params[1]) if action == "snooze" and len(params) > 1 and params[1].isdigit() else None
+    if account is None or (action == "snooze" and days not in SNOOZE_DAYS):
         answer_callback_query(query_id, "This button isn't valid for this chat.")
         return
 
-    account.mark_traded()
-    answer_callback_query(query_id, "Countdown reset ✅")
-    confirmation = _traded_confirmation(account)
+    if action == "snooze":
+        account.snooze(days)
+        answer_callback_query(query_id, f"Snoozed for {days} day(s) 💤")
+        local = timezone.localtime(account.snoozed_until, account.user.get_timezone())
+        confirmation = (
+            f"💤 Snoozed until {local:%b %d, %H:%M}. The final reminder before "
+            "the deadline still comes through."
+        )
+    else:
+        account.mark_traded()
+        answer_callback_query(query_id, "Countdown reset ✅")
+        confirmation = _traded_confirmation(account)
     original = message.get("text") or ""
     edit_message_text(
         chat_id,

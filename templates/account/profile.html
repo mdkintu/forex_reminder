@@ -26,7 +26,18 @@
                         <label for="{{ field.id_for_label }}" class="form-label">
                             {{ field.label }}
                         </label>
-                        {{ field }}
+                        {% if field.name == "reminder_hours" %}
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for box in field %}
+                                    <div class="form-check form-check-inline me-0" style="min-width: 5.5rem;">
+                                        {{ box.tag }}
+                                        <label class="form-check-label" for="{{ box.id_for_label }}">{{ box.choice_label }}</label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            {{ field }}
+                        {% endif %}
                         {% if field.help_text %}
                             <div class="form-text">{{ field.help_text }}</div>
                         {% endif %}
@@ -69,6 +80,25 @@
             {% else %}
                 <p class="text-secondary small mb-0">Telegram reminders aren't configured on this server.</p>
             {% endif %}
+
+            <hr class="my-4">
+
+            <h2 class="h6 fw-semibold mb-2">Calendar</h2>
+            <p class="text-secondary small mb-2">
+                Subscribe to this private link in Google Calendar ("Other calendars → From URL"),
+                Apple Calendar or Outlook to see every account's deadline, with alerts 3 days and
+                1 day before. It updates automatically when you record a trade. Keep it private.
+            </p>
+            <div class="input-group input-group-sm mb-2">
+                <input type="text" class="form-control" readonly value="{{ calendar_url }}" aria-label="Calendar feed URL" onclick="this.select()">
+                <a class="btn btn-outline-primary" href="{{ calendar_url }}">Download .ics</a>
+            </div>
+            <form method="post" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" name="regenerate_calendar" value="1" class="btn btn-outline-secondary btn-sm">
+                    Regenerate link
+                </button>
+            </form>
 
             <hr class="my-4">
 

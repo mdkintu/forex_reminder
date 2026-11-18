@@ -70,6 +70,12 @@ class User(AbstractUser):
     reminder_days_left = models.JSONField(
         null=True, blank=True, validators=[validate_optional_reminder_days]
     )
+    # Local hours (0-23, at most 3) at which reminders are sent on a reminder
+    # day. None = settings.REMINDER_SEND_HOURS (normally 9 and 14).
+    reminder_hours = models.JSONField(null=True, blank=True)
+    # Secret token in the user's private calendar-feed URL (.ics). Generated
+    # on first use; regenerating it revokes the old URL.
+    calendar_token = models.CharField(max_length=43, blank=True, db_index=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []  # Email is already required via USERNAME_FIELD
@@ -100,6 +106,23 @@ class User(AbstractUser):
                 self.timezone = value
         except (zoneinfo.ZoneInfoNotFoundError, ValueError, TypeError):
             pass  # ignore junk from the client
+
+    def get_reminder_hours(self) -> list[int]:
+        """Sorted local hours at which this user's reminders are sent."""
+        from django.conf import settings
+
+        hours = self.reminder_hours or getattr(settings, "REMINDER_SEND_HOURS", [9, 14])
+        return sorted({int(h) for h in hours if 0 <= int(h) <= 23})
+
+    def get_or_create_calendar_token(self) -> str:
+        if not self.calendar_token:
+            self.regenerate_calendar_token()
+        return self.calendar_token
+
+    def regenerate_calendar_token(self) -> str:
+        self.calendar_token = secrets.token_urlsafe(32)
+        self.save(update_fields=["calendar_token"])
+        return self.calendar_token
 
     def get_or_create_telegram_link_token(self) -> str:
         """A valid token for the "Connect Telegram" deep link, generating a
