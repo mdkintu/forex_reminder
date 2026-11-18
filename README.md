@@ -157,6 +157,27 @@ the user's local hour, running it **hourly** is perfectly fine:
 that hour, within `REMINDER_GRACE_HOURS`, and deduplicates per slot, so an
 hourly cron catches both windows without double-sending.)
 
+### Checking that reminders are working
+
+```bash
+python manage.py send_reminders --dry-run
+```
+
+prints every account with its day count, days left, the reason it is or isn't
+due right now (`due`, `not_reminder_day`, `past_deadline`, `no_slot_due`,
+`traded_since_slot`) and its next reminder time. Nothing is sent or recorded.
+
+Every real run is also:
+
+- **logged** with timestamps (one line per account) to the cron log;
+- **recorded** as a *Reminder run* in the admin (checked / sent / skipped / failed);
+- followed, once a day after `ADMIN_REPORT_HOUR` UTC, by a **daily admin report**
+  to `ADMIN_TELEGRAM_CHAT_ID` (or `ADMIN_EMAILS`). It lists the runs of the last
+  24 h and flags any account within 3 days of its deadline that has had **no
+  reminder delivered** this cycle;
+- followed by a ping to `HEALTHCHECK_PING_URL`, if set. Create a free check at
+  healthchecks.io with a 1-hour period: if cron stops running, it alerts you.
+
 ### Option B — Celery Beat (optional, needs Redis)
 
 For a non-cPanel deployment you can instead use Celery with `django-celery-beat`:
@@ -229,6 +250,10 @@ sensible development defaults, so you only need to set what you actually use.
 | `TELEGRAM_BOT_TOKEN`     | *(empty)*                       | Telegram bot token |
 | `TELEGRAM_BOT_USERNAME`  | *(empty)*                       | Bot's public @username (no `@`) — powers the "Connect Telegram" deep link |
 | `TELEGRAM_WEBHOOK_SECRET`| *(empty)*                       | Random secret verifying incoming Telegram webhook calls |
+| `ADMIN_TELEGRAM_CHAT_ID` | *(empty)*                       | Telegram chat id that gets the daily health report of the reminder job |
+| `ADMIN_EMAILS`           | *(empty)*                       | Comma-separated emails; report fallback when no admin chat id is set |
+| `ADMIN_REPORT_HOUR`      | `6`                             | UTC hour from which the daily report is sent |
+| `HEALTHCHECK_PING_URL`   | *(empty)*                       | Optional dead-man's-switch URL (e.g. healthchecks.io) pinged after every run |
 
 > ⚠️ **`DEBUG`** defaults to `True` for local convenience, but you **must set
 > `DEBUG=False` explicitly in production** (e.g. in your `.env`). Shipping with

@@ -13,6 +13,20 @@
 
 ---
 
+## Roadmap (plan approved 2026-11-18)
+
+Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram buttons/commands), 3 per-account inactivity limits + reminders as "days left", 4 reliable delivery (retries, catch-up, test reminder), 5 UX (urgency dashboard, .ics feed, snooze, per-user send hours). Deferred: MT4/MT5 auto-sync. WhatsApp stays hidden.
+
+### Phase 1: health monitoring ✅ (deploy pending)
+- `send_reminders --dry-run`: per-account decision + reason, sends nothing.
+- `trades.tasks.evaluate_account()` (pure decision) / `run_reminders()` (returns `RunSummary`); `check_and_send_reminders()` is a thin Celery wrapper.
+- `ReminderRun` model logs every real run (read-only in admin).
+- `trades/reporting.py`: daily admin report (Telegram `ADMIN_TELEGRAM_CHAT_ID`, fallback `ADMIN_EMAILS`) flagging accounts ≤3 days from deadline with nothing delivered; `HEALTHCHECK_PING_URL` ping after each run.
+- `LOGGING`: timestamped INFO logs for `trades`/`accounts` → `reminders.log`.
+- **Deploy:** `git pull`, `migrate` (0006), add `ADMIN_TELEGRAM_CHAT_ID=<your chat id>` (and optionally `HEALTHCHECK_PING_URL`) to `.env`, restart. Check: `python manage.py send_reminders --dry-run`.
+
+---
+
 ## Tech Stack
 
 - **Framework:** Django 5.2 LTS (Python 3.10+)

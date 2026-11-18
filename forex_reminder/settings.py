@@ -289,3 +289,36 @@ TELEGRAM_BOT_USERNAME = config("TELEGRAM_BOT_USERNAME", default="")
 # `set_telegram_webhook` (see that management command), which registers this
 # same value with Telegram's servers.
 TELEGRAM_WEBHOOK_SECRET = config("TELEGRAM_WEBHOOK_SECRET", default="")
+
+# ----------------------------------------------------------------------------
+# Monitoring (see trades/reporting.py)
+# ----------------------------------------------------------------------------
+# Telegram chat id that receives the once-a-day health report of the reminder
+# job (find yours as `telegram_chat_id` on your own user in the admin). If
+# empty, the report is emailed to ADMINS instead.
+ADMIN_TELEGRAM_CHAT_ID = config("ADMIN_TELEGRAM_CHAT_ID", default="")
+# UTC hour from which the daily report is sent (first cron run at/after it).
+ADMIN_REPORT_HOUR = config("ADMIN_REPORT_HOUR", default=6, cast=int)
+# Comma-separated admin emails (fallback recipients of the daily report).
+ADMINS = [("Admin", e) for e in config("ADMIN_EMAILS", default="", cast=Csv())]
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Optional dead-man's-switch URL (e.g. https://hc-ping.com/<uuid>) pinged after
+# every send_reminders run, so a cron that stops running is noticed.
+HEALTHCHECK_PING_URL = config("HEALTHCHECK_PING_URL", default="")
+
+# Timestamped logs on stderr. Cron appends this to reminders.log, so each run
+# and every per-account decision is recorded with its time.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "timestamped": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "timestamped"},
+    },
+    "loggers": {
+        "trades": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "accounts": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}

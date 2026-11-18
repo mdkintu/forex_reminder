@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ReminderHistory, ReminderSchedule, TradingAccount
+from .models import ReminderHistory, ReminderRun, ReminderSchedule, TradingAccount
 
 
 class ReminderHistoryInline(admin.TabularInline):
@@ -40,3 +40,18 @@ class ReminderHistoryAdmin(admin.ModelAdmin):
 @admin.register(ReminderSchedule)
 class ReminderScheduleAdmin(admin.ModelAdmin):
     list_display = ["id", "day_list", "updated_at"]
+
+
+@admin.register(ReminderRun)
+class ReminderRunAdmin(admin.ModelAdmin):
+    """Read-only log of reminder-job runs (written by the job itself)."""
+
+    list_display = ["finished_at", "checked", "sent", "skipped", "failed", "report_sent"]
+    list_filter = ["report_sent"]
+    date_hierarchy = "finished_at"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

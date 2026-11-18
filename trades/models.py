@@ -306,3 +306,31 @@ class ReminderHistory(models.Model):
             f"{self.account} — day {self.day_number} via "
             f"{self.get_channel_display()} ({self.status})"
         )
+
+
+class ReminderRun(models.Model):
+    """One execution of the reminder job (cron or Celery), for monitoring.
+
+    Written at the end of every real (non-dry) run so the daily admin report
+    and the admin can show whether the job is actually running and what it
+    did. A missing run for hours means cron is broken.
+    """
+
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField()
+    checked = models.PositiveIntegerField(default=0)
+    sent = models.PositiveIntegerField(default=0)
+    skipped = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    #: Set on the run during which the daily admin report went out, so the
+    #: report is sent at most once per day.
+    report_sent = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-finished_at"]
+
+    def __str__(self):
+        return (
+            f"{self.finished_at:%Y-%m-%d %H:%M} — checked {self.checked}, "
+            f"sent {self.sent}, skipped {self.skipped}, failed {self.failed}"
+        )
