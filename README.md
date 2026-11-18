@@ -9,7 +9,7 @@ inactivity clause.
 
 It tracks the days since your last trade on each account and sends reminders
 **twice daily (9 AM and 2 PM, in the user's local timezone)** on a configurable
-schedule of day numbers (default: 10, 15, 25–29).
+schedule of day numbers (default: 10, 15, 25–30).
 
 Built with:
 
@@ -181,11 +181,13 @@ python manage.py create_reminder_schedule
 
 ### Configuring reminder days
 
-The default reminder day numbers are `[10, 15, 25, 26, 27, 28, 29]`. (No day-30
-reminder by default: the deadline is exactly 30 days after the last trade, so a
-day-30 reminder could arrive after the account is already closed. Reminders are
-never sent once the deadline has passed.) To
-change them interactively:
+The default reminder day numbers are `[10, 15, 25, 26, 27, 28, 29, 30]`. Day 30
+is the final, most urgent reminder. Days are counted as calendar days in the
+user's timezone, so the day-30 reminder still goes out on day 30 even if the
+exact deadline (last trade + 30 days, to the second) falls earlier that day.
+Accounts more than 30 days inactive get no further reminders. These defaults
+apply only until a schedule is saved; once a `ReminderSchedule` row exists,
+its day list is used instead. To view or change them interactively:
 
 ```bash
 python manage.py set_reminder_days
