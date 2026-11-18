@@ -253,6 +253,8 @@ sensible development defaults, so you only need to set what you actually use.
 | `EMAIL_TIMEOUT`          | `30`                            | SMTP timeout in seconds |
 | `REMINDER_SEND_HOURS`    | `9,14`                          | Comma-separated local hours (0-23) for the daily reminder slots |
 | `REMINDER_GRACE_HOURS`   | `3`                             | A missed slot is still sent on a cron run up to this many hours late |
+| `REMINDER_MAX_ATTEMPTS`  | `3`                             | A failed send is retried on later runs of the same slot, up to this many attempts |
+| `REMINDER_CATCHUP_DAYS`  | `2`                             | A reminder day that passed with nothing delivered is sent late (once) within this many days |
 | `TWILIO_ACCOUNT_SID`     | *(empty)*                       | Twilio account SID (WhatsApp) |
 | `TWILIO_AUTH_TOKEN`      | *(empty)*                       | Twilio auth token |
 | `TWILIO_PHONE_NUMBER`    | *(empty)*                       | Twilio phone number |
@@ -340,10 +342,18 @@ The core task is `check_and_send_reminders` in `trades/tasks.py`. It:
    `skipped`, not `sent`.
 5. Skips the later-in-day slot (e.g. the 2 PM one) if the user placed a trade
    **after** the earlier slot that day (they already reacted to the 9 AM one).
-6. Writes a `ReminderHistory` row for each account+cycle+day+channel+slot (cycle = the
-   `last_trade_date` it was sent for, so a new trade restarts the reminders) before
-   sending, and marks it `sent` afterward. The database's unique constraint
-   guarantees a reminder is never sent twice for the same slot.
+6. Claims a `ReminderHistory` row for each account+cycle+day+channel+slot (cycle =
+   the `last_trade_date` it was sent for, so a new trade restarts the reminders),
+   sends **outside** any database transaction, then records `sent`, `skipped`
+   (channel not configured) or `failed` with the error. Failed sends are retried
+   on later runs of the same slot (`REMINDER_MAX_ATTEMPTS`). The unique
+   constraint plus an atomic claim guarantee a reminder is never sent twice.
+7. If a reminder day passed with nothing delivered (cron down, an outage), it is
+   sent late, once, marked **catch-up**, within `REMINDER_CATCHUP_DAYS`.
+
+Users can check their own delivery with **Send me a test reminder** on the
+profile page; each account page shows every reminder's status, attempts and
+error.
 
 The next reminder time (for the live countdown on the UI) is computed by
 `TradingAccount.next_reminder_datetime()`, which mirrors these same rules.

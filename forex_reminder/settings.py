@@ -322,3 +322,11 @@ LOGGING = {
         "accounts": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
+
+# Delivery reliability (see trades.tasks).
+# A reminder that fails to send is retried on later runs of the same slot, up
+# to this many attempts in total.
+REMINDER_MAX_ATTEMPTS = config("REMINDER_MAX_ATTEMPTS", default=3, cast=int)
+# A reminder day that passed with nothing delivered (cron down, outage) is
+# sent late, once, if it was at most this many days ago.
+REMINDER_CATCHUP_DAYS = config("REMINDER_CATCHUP_DAYS", default=2, cast=int)

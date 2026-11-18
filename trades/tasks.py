@@ -6,6 +6,7 @@ from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from .models import ReminderHistory, ReminderRun, ReminderSchedule, TradingAccount
@@ -36,19 +37,28 @@ def _recipient_name(account):
 # ============================================================================
 
 
-def _send_email(account, day_number):
+def _days_left_phrase(account):
+    days = account.days_remaining
+    unit = "day" if days == 1 else "days"
+    if days == 0:
+        return f"Today is the last day before its {account.inactivity_days}-day inactivity limit."
+    return f"{days} {unit} left before its {account.inactivity_days}-day inactivity limit."
+
+
+def _send_email(account, day_number, missed=False):
     """Send the inactivity reminder via email.
 
     Uses settings.EMAIL_BACKEND (console for dev, SMTP for production).
     """
     name = _recipient_name(account)
-    subject = f"Inactivity reminder: {account.account_name}"
+    prefix = "Missed reminder — " if missed else ""
+    subject = f"{prefix}Inactivity reminder: {account.account_name}"
     message = (
         f"Hello {name},\n\n"
         f"Your trading account '{account.account_name}' "
         f"(account #: {account.account_number or 'n/a'}, "
         f"broker: {account.broker or 'unknown'}) has had no trade for "
-        f"{day_number} days.\n\n"
+        f"{day_number} days. {_days_left_phrase(account)}\n\n"
         f"Last trade was on {account.last_trade_date:%Y-%m-%d %H:%M}.\n\n"
         f"Please place a trade to keep the account active, or contact your broker.\n\n"
         f"Already traded? Reset the countdown in one click:\n{traded_url(account)}\n\n"
@@ -57,30 +67,28 @@ def _send_email(account, day_number):
     return send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [account.user.email])
 
 
-def _send_whatsapp(account, day_number):
+def _chat_text(account, day_number, missed):
+    name = _recipient_name(account)
+    prefix = "(missed reminder) " if missed else ""
+    return (
+        f"⚠️ {prefix}Hello {name}, inactivity reminder: account "
+        f"'{account.account_name}' (#{account.account_number or 'n/a'}, "
+        f"broker: {account.broker or 'unknown'}) has had no trade for "
+        f"{day_number} days. {_days_left_phrase(account)} "
+        f"Please place a trade to keep it active."
+    )
+
+
+def _send_whatsapp(account, day_number, missed=False):
     """Send the inactivity reminder via WhatsApp to the user's phone number."""
-    name = _recipient_name(account)
-    body = (
-        f"⚠️ Hello {name}, inactivity reminder: account "
-        f"'{account.account_name}' (#{account.account_number or 'n/a'}, "
-        f"broker: {account.broker or 'unknown'}) has had no trade for "
-        f"{day_number} days. Please place a trade to keep it active."
-    )
-    return send_whatsapp_message(account.user.phone_number, body)
+    return send_whatsapp_message(account.user.phone_number, _chat_text(account, day_number, missed))
 
 
-def _send_telegram(account, day_number):
+def _send_telegram(account, day_number, missed=False):
     """Send the inactivity reminder via Telegram to the user's chat id."""
-    name = _recipient_name(account)
-    text = (
-        f"⚠️ Hello {name}, inactivity reminder: account "
-        f"'{account.account_name}' (#{account.account_number or 'n/a'}, "
-        f"broker: {account.broker or 'unknown'}) has had no trade for "
-        f"{day_number} days. Please place a trade to keep it active."
-    )
     return send_telegram_message(
         account.user.telegram_chat_id,
-        text,
+        _chat_text(account, day_number, missed),
         buttons=[[("✅ I traded", f"traded:{account.pk}")]],
     )
 
@@ -162,50 +170,78 @@ class Decision:
     """Whether an account is due a reminder right now, and why (not)."""
 
     reason: str
+    #: The reminder day this decision is for (days since last trade). For a
+    #: catch-up this is the missed day, not today.
     day_number: int
     slot_hour: int | None = None
+    catch_up: bool = False
 
     @property
     def due(self) -> bool:
         return self.reason == DUE
 
 
+def _missed_day(account, reminder_days, days_since):
+    """The most recent reminder day in the catch-up window that passed without
+    any delivery (sent or skipped) in this cycle, or None."""
+    window = max(0, getattr(settings, "REMINDER_CATCHUP_DAYS", 2))
+    candidates = [d for d in reminder_days if days_since - window <= d < days_since]
+    if not candidates:
+        return None
+    day = max(candidates)
+    handled = ReminderHistory.objects.filter(
+        account=account,
+        cycle_start=account.last_trade_date,
+        day_number=day,
+        status__in=[ReminderHistory.Status.SENT, ReminderHistory.Status.SKIPPED],
+    ).exists()
+    return None if handled else day
+
+
 def evaluate_account(account, reminder_days, send_hours, grace_hours, now=None) -> Decision:
     """Decide whether ``account`` is due a reminder at ``now`` (default: now).
 
-    Pure decision logic, no side effects: used by the real run and by
+    ``reminder_days`` are days since the last trade (see
+    TradingAccount.reminder_days). Has no side effects (it only reads
+    ReminderHistory for catch-ups): used by the real run and by
     ``send_reminders --dry-run``.
     """
     now = now or timezone.now()
     # Days since last trade in the account owner's local timezone.
     days_since = account.days_since_last_trade
 
-    if days_since not in reminder_days:
-        return Decision(NOT_REMINDER_DAY, days_since)
-
-    # Never remind about an account that's genuinely past the inactivity
-    # threshold. Compared by calendar day (days_since), not the exact
-    # deadline instant (last_trade_date + 30 days to the second) — that
-    # instant is tied to the original trade's time-of-day and would
-    # wrongly hide the day-30 reminder whenever the last trade happened
-    # earlier in the day than the configured send hours.
+    # Never remind about an account that's genuinely past its inactivity
+    # limit. Compared by calendar day (days_since), not the exact deadline
+    # instant (last_trade_date + limit, to the second) — that instant is tied
+    # to the original trade's time-of-day and would wrongly hide the
+    # deadline-day reminder whenever the last trade happened earlier in the
+    # day than the configured send hours.
     if days_since > account.inactivity_days:
         return Decision(PAST_DEADLINE, days_since)
+
+    day, catch_up = days_since, False
+    if days_since not in reminder_days:
+        # A reminder day that passed with nothing delivered (cron down, a
+        # bug, an outage) is sent late, once, within REMINDER_CATCHUP_DAYS.
+        missed = _missed_day(account, reminder_days, days_since)
+        if missed is None:
+            return Decision(NOT_REMINDER_DAY, days_since)
+        day, catch_up = missed, True
 
     # The delivery slot that is due now in the owner's local time (the
     # latest slot at or before the current hour, within the grace window).
     local_now = timezone.localtime(now, account.user.get_timezone())
     local_hour = _due_slot_hour(local_now, send_hours, grace_hours)
     if local_hour is None:
-        return Decision(NO_SLOT_DUE, days_since)
+        return Decision(NO_SLOT_DUE, day, catch_up=catch_up)
 
     # Skip later-in-the-day slots if the user already traded after the
     # previous reminder slot (e.g. skip the 2 PM reminder if they traded
     # after the 9 AM one).
     if _traded_since_last_slot(account, local_hour, send_hours, now=now):
-        return Decision(TRADED_SINCE_SLOT, days_since, local_hour)
+        return Decision(TRADED_SINCE_SLOT, day, local_hour, catch_up)
 
-    return Decision(DUE, days_since, local_hour)
+    return Decision(DUE, day, local_hour, catch_up)
 
 
 # ============================================================================
@@ -226,81 +262,107 @@ class RunSummary:
     decisions: list = field(default_factory=list)
 
 
+def _claim(account, decision, channel):
+    """Create or claim the history row for this reminder; return it if this
+    worker should send it now, else None.
+
+    * New row: created as PENDING with attempts=1 (the unique constraint means
+      exactly one worker can create it).
+    * Existing FAILED row under the attempt cap: atomically flipped back to
+      PENDING (attempts + 1) — only one worker can win that update.
+    * SENT / SKIPPED rows are final; PENDING rows belong to a worker that is
+      sending them (or crashed mid-send) and are never sent twice.
+    """
+    Status = ReminderHistory.Status
+    key = dict(
+        account=account,
+        cycle_start=account.last_trade_date,
+        day_number=decision.day_number,
+        channel=channel,
+        slot_hour=decision.slot_hour,
+    )
+    try:
+        with transaction.atomic():
+            history, created = ReminderHistory.objects.get_or_create(
+                **key,
+                defaults={"status": Status.PENDING, "attempts": 1, "catch_up": decision.catch_up},
+            )
+    except IntegrityError:
+        return None  # a concurrent worker created it first
+    if created:
+        return history
+
+    max_attempts = getattr(settings, "REMINDER_MAX_ATTEMPTS", 3)
+    claimed = ReminderHistory.objects.filter(
+        pk=history.pk, status=Status.FAILED, attempts__lt=max_attempts
+    ).update(status=Status.PENDING, attempts=F("attempts") + 1, error="")
+    if not claimed:
+        return None
+    history.refresh_from_db()
+    return history
+
+
 def _send_due_reminders(account, decision, summary) -> None:
-    """Send ``decision``'s reminder on every enabled channel not yet sent."""
-    days_since, local_hour = decision.day_number, decision.slot_hour
+    """Send ``decision``'s reminder on every enabled channel that still needs it.
+
+    The history row is claimed in its own short transaction and the message is
+    sent *outside* any transaction, then the outcome is recorded: SENT,
+    SKIPPED (channel not configured), or FAILED with the error (retried on
+    later runs of the same slot, up to REMINDER_MAX_ATTEMPTS).
+    """
+    Status = ReminderHistory.Status
+    days_since = account.days_since_last_trade  # the real count, for the message
 
     for channel in ReminderHistory.Channel.values:  # email, whatsapp, telegram
         if not _channel_is_enabled(account, channel):
             continue
-
-        already_sent = ReminderHistory.objects.filter(
-            account=account,
-            cycle_start=account.last_trade_date,
-            day_number=days_since,
-            channel=channel,
-            slot_hour=local_hour,
-        ).exists()
-        if already_sent:
+        history = _claim(account, decision, channel)
+        if history is None:
             continue
 
         try:
-            with transaction.atomic():
-                history = ReminderHistory.objects.create(
-                    account=account,
-                    cycle_start=account.last_trade_date,
-                    day_number=days_since,
-                    channel=channel,
-                    status="pending",
-                    slot_hour=local_hour,
-                )
-                result = SENDERS[channel](account, days_since)
-
-                if not result:
-                    # Channel not configured / no recipient: record it as
-                    # skipped (so we don't retry every hour) but don't
-                    # pretend it was delivered.
-                    history.status = "skipped"
-                    history.save(update_fields=["status"])
-                    summary.skipped += 1
-                    logger.warning(
-                        "[reminder] Skipped '%s' reminder for account '%s' "
-                        "(channel not configured or no recipient).",
-                        channel,
-                        account.account_name,
-                    )
-                    continue
-
-                history.status = "sent"
-                history.save(update_fields=["status"])
-                summary.sent += 1
-                logger.info(
-                    "[reminder] Sent '%s' reminder for account '%s' (day %s, %02d:00 local).",
-                    channel,
-                    account.account_name,
-                    days_since,
-                    local_hour,
-                )
-        except IntegrityError:
-            # A concurrent worker created the record first — skip it.
-            logger.info(
-                "[reminder] Duplicate reminder skipped for account '%s' "
-                "(day %s, channel %s, hour %s).",
-                account.account_name,
-                days_since,
-                channel,
-                local_hour,
-            )
-        except Exception as exc:  # noqa: BLE001 - log and continue
+            result = SENDERS[channel](account, days_since, missed=decision.catch_up)
+        except Exception as exc:  # noqa: BLE001 - record, log and continue
+            history.status = Status.FAILED
+            history.error = f"{type(exc).__name__}: {exc}"[:1000]
+            history.save(update_fields=["status", "error"])
             summary.failed += 1
             logger.exception(
                 "[reminder] Failed to send '%s' reminder for account '%s' "
-                "(day %s): %s",
+                "(day %s, attempt %s): %s",
                 channel,
                 account.account_name,
-                days_since,
+                decision.day_number,
+                history.attempts,
                 exc,
             )
+            continue
+
+        if not result:
+            # Channel not configured / no recipient: final, don't retry
+            # every hour, but don't pretend it was delivered either.
+            history.status = Status.SKIPPED
+            history.save(update_fields=["status"])
+            summary.skipped += 1
+            logger.warning(
+                "[reminder] Skipped '%s' reminder for account '%s' "
+                "(channel not configured or no recipient).",
+                channel,
+                account.account_name,
+            )
+            continue
+
+        history.status = Status.SENT
+        history.save(update_fields=["status"])
+        summary.sent += 1
+        logger.info(
+            "[reminder] Sent '%s' reminder for account '%s' (day %s%s, %02d:00 local).",
+            channel,
+            account.account_name,
+            decision.day_number,
+            ", catch-up" if decision.catch_up else "",
+            decision.slot_hour,
+        )
 
 
 def run_reminders(dry_run: bool = False) -> RunSummary:

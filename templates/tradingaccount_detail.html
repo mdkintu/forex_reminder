@@ -120,20 +120,24 @@
                                 <th scope="col">Time slot</th>
                                 <th scope="col">Channel</th>
                                 <th scope="col">Status</th>
+                                <th scope="col">Tries</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for r in reminder_history %}
                                 <tr>
                                     <td>{{ r.sent_at|date:"M j, Y H:i" }}</td>
-                                    <td>{{ r.day_number }}</td>
+                                    <td>{{ r.day_number }}{% if r.catch_up %} <span class="badge bg-info text-dark" title="Sent late for a missed reminder day">catch-up</span>{% endif %}</td>
                                     <td>{{ r.slot_hour|stringformat:"02d" }}:00</td>
                                     <td>{{ r.get_channel_display }}</td>
                                     <td>
-                                        <span class="badge {% if r.status == 'sent' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                        <span class="badge {% if r.status == 'sent' %}bg-success{% elif r.status == 'failed' %}bg-danger{% else %}bg-warning text-dark{% endif %}"
+                                              {% if r.error %}title="{{ r.error }}"{% endif %}>
                                             {{ r.status }}
                                         </span>
+                                        {% if r.error %}<div class="small text-danger text-break">{{ r.error|truncatechars:120 }}</div>{% endif %}
                                     </td>
+                                    <td>{{ r.attempts }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>

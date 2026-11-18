@@ -10,6 +10,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from allauth.account.models import EmailAddress
+from django.core.cache import cache
+from django.core.mail import send_mail
+from trades.notifications import send_telegram_message
 from trades.models import TradingAccount
 
 from . import telegram_bot
@@ -136,6 +139,48 @@ def profile(request):
             "telegram_connect_url": telegram_connect_url,
         },
     )
+
+
+#: Seconds a user must wait between "Send me a test reminder" clicks.
+TEST_REMINDER_COOLDOWN = 5 * 60
+
+
+@login_required
+@require_POST
+def test_reminder(request):
+    """Send a test message on each of the user's channels and report the
+    outcome per channel, so delivery problems (e.g. SMTP misconfiguration,
+    a blocked bot) are visible to the user right away."""
+    user = request.user
+    cache_key = f"fair:test-reminder:{user.pk}"
+    if not cache.add(cache_key, True, TEST_REMINDER_COOLDOWN):
+        messages.warning(request, "Test reminder already sent — please wait a few minutes before trying again.")
+        return redirect("accounts:profile")
+
+    text = (
+        "✅ This is a test reminder from FAIR. If you can read it, reminders "
+        "will reach you on this channel."
+    )
+    try:
+        send_mail("FAIR test reminder", text, settings.DEFAULT_FROM_EMAIL, [user.email])
+        messages.success(request, f"Email: test sent to {user.email}. Check your inbox (and spam folder).")
+    except Exception as exc:  # noqa: BLE001 - report to the user
+        logger.exception("[test reminder] Email to %s failed.", user.email)
+        messages.error(request, f"Email: sending failed — {type(exc).__name__}: {exc}")
+
+    if user.telegram_chat_id:
+        try:
+            if send_telegram_message(user.telegram_chat_id, text):
+                messages.success(request, "Telegram: test sent. Check the FAIR bot chat.")
+            else:
+                messages.warning(request, "Telegram: not configured on this server.")
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("[test reminder] Telegram to chat %s failed.", user.telegram_chat_id)
+            messages.error(request, f"Telegram: sending failed — {type(exc).__name__}: {exc}")
+    else:
+        messages.info(request, "Telegram: not connected (connect it below to get reminders there too).")
+
+    return redirect("accounts:profile")
 
 
 @csrf_exempt

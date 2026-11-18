@@ -72,6 +72,18 @@
 
             <hr class="my-4">
 
+            <h2 class="h6 fw-semibold mb-2">Check delivery</h2>
+            <p class="text-secondary small mb-2">
+                Sends a test message by email{% if user.telegram_chat_id %} and Telegram{% endif %}
+                right now, so you know reminders will reach you.
+            </p>
+            <form method="post" action="{% url 'accounts:test_reminder' %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-primary btn-sm">Send me a test reminder</button>
+            </form>
+
+            <hr class="my-4">
+
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{% url 'account_email' %}" class="btn btn-outline-primary btn-sm">
                     Manage email

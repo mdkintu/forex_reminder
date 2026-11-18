@@ -310,9 +310,23 @@ class ReminderHistory(models.Model):
     )
     sent_at = models.DateTimeField(auto_now_add=True)
     channel = models.CharField(max_length=20, choices=Channel.choices)
-    #: "pending" while sending, "sent" on success, "skipped" when the channel
-    #: isn't configured (no credentials / no phone / no chat id).
-    status = models.CharField(max_length=20, default="sent")
+    class Status(models.TextChoices):
+        #: Created and being sent right now (also left behind if a worker
+        #: crashed mid-send; such rows are not retried, to avoid duplicates).
+        PENDING = "pending", "Sending"
+        SENT = "sent", "Sent"
+        #: Channel not configured (no credentials / no chat id). Final.
+        SKIPPED = "skipped", "Skipped"
+        #: Sending raised an error; retried on later runs of the same slot,
+        #: up to settings.REMINDER_MAX_ATTEMPTS attempts.
+        FAILED = "failed", "Failed"
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SENT)
+    attempts = models.PositiveSmallIntegerField(default=1)
+    #: The last delivery error (for failed rows).
+    error = models.TextField(blank=True)
+    #: Sent late, for a reminder day that passed without any delivery.
+    catch_up = models.BooleanField(default=False)
     # The local hour (0-23) this reminder was intended for, so the two daily
     # delivery slots (e.g. 9 AM and 2 PM) are each recorded separately.
     slot_hour = models.PositiveSmallIntegerField(default=0)

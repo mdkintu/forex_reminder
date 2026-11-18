@@ -33,8 +33,12 @@ class TradingAccountAdmin(admin.ModelAdmin):
 
 @admin.register(ReminderHistory)
 class ReminderHistoryAdmin(admin.ModelAdmin):
-    list_display = ["account", "day_number", "channel", "slot_hour", "status", "sent_at"]
-    list_filter = ["channel", "status", "slot_hour"]
+    list_display = ["account", "day_number", "channel", "slot_hour", "status", "attempts", "catch_up", "short_error", "sent_at"]
+    list_filter = ["channel", "status", "catch_up", "slot_hour"]
+
+    @admin.display(description="Error")
+    def short_error(self, obj):
+        return (obj.error[:80] + "…") if len(obj.error) > 80 else obj.error
     search_fields = ["account__account_name"]
 
 

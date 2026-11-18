@@ -40,6 +40,14 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - `set_reminder_days` takes days-left values (`--days-after` converts old style).
 - **Deploy:** `git pull`, `migrate` (accounts 0006, trades 0007), restart. Then set the real schedule, e.g. `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, and set each account's limit if the firm isn't 30 days.
 
+### Phase 4: reliable delivery ✅ (deploy pending)
+- `ReminderHistory.Status` (pending/sent/skipped/failed) + `attempts`, `error`, `catch_up` (migration 0008).
+- Sends happen outside DB transactions; rows are claimed atomically (`trades.tasks._claim`); failures recorded and retried within the slot up to `REMINDER_MAX_ATTEMPTS` (3).
+- Missed reminder days are caught up once within `REMINDER_CATCHUP_DAYS` (2); past-deadline is now checked first.
+- Messages state days left before the account's own limit.
+- Profile "Send me a test reminder" (`accounts:test_reminder`, 5-min cooldown) reports per-channel success/error. Account page shows status, tries, error.
+- **Deploy:** `git pull`, `migrate` (trades 0008), restart. Then on the live site use **Send me a test reminder** to confirm SMTP works, and remove the duplicate `EMAIL_BACKEND` line from the server `.env`.
+
 ---
 
 ## Tech Stack
