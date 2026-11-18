@@ -1,6 +1,15 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-09-22 | **Git SHA:** 3d53511
+**Last updated:** 2026-11-18 | **Git SHA:** 0ecf9fb
+
+---
+
+## 2026-11-18: Production stopped sending reminders (fixed in code, deploy pending)
+
+- **Bug (fixed, `2530a77`):** dedup ignored the trade cycle, so each account got each reminder day only once in its lifetime. Production sent nothing after 2026-10-06. Fix: `ReminderHistory.cycle_start` + migration `trades/0005`.
+- **Prod config:** the live `ReminderSchedule` is `[10, 15, 20]`, so nothing is sent on days 21-30.
+- **Pending on server** (`/home/tergfern/fair`): `git pull`, `python manage.py migrate`, `python manage.py set_reminder_days` (e.g. 10 15 20 25 26 27 28 29 30), restart the app. Then check `reminders.log` for "Sent ... reminder" lines and run `python manage.py sendtestemail` (history shows only Telegram rows).
+- Cron (hourly `send_reminders >> reminders.log`) and `.env` were verified fine.
 
 ---
 
@@ -48,8 +57,9 @@
 - Day 30 is in the default: compared by calendar day (local TZ), not the exact deadline instant
 
 ### ReminderHistory (trades/models.py)
-- FK to TradingAccount; fields: day_number, sent_at, channel (email/whatsapp/telegram), status (pending/sent/skipped), slot_hour
-- Unique constraint: (account, day_number, channel, slot_hour) prevents dupes
+- FK to TradingAccount; fields: day_number, sent_at, channel (email/whatsapp/telegram), status (pending/sent/skipped), slot_hour, cycle_start
+- `cycle_start` = the account's `last_trade_date` when sent (which inactivity cycle it belongs to); NULL for pre-0005 rows from past cycles
+- Unique constraint: (account, cycle_start, day_number, channel, slot_hour) prevents dupes within a cycle; a new trade starts a fresh cycle
 
 ---
 
@@ -60,7 +70,7 @@
 3. **Trading account CRUD** — create, read, update, delete with user isolation
 4. **Inactivity tracking** — `days_since_last_trade` computed in local TZ
 5. **Reminder scheduling** — twice-daily slots (9 AM & 2 PM local), configurable day list
-6. **Smart deduplication** — unique constraint on (account, day, channel, slot_hour)
+6. **Smart deduplication** — unique constraint on (account, cycle_start, day, channel, slot_hour)
 7. **Multi-channel delivery** — email (Django), WhatsApp (Twilio), Telegram (bot)
 8. **Telegram webhook** — one-tap "Connect Telegram" via `t.me/<bot>?start=<token>`
 9. **Live countdowns** — JS ticking timers for inactivity deadline and next reminder
@@ -90,7 +100,7 @@ check_and_send_reminders():
   - Get due_slot_hour (latest hour <= now, within grace_hours)
   - Skip if user traded after previous slot (later-in-day rule)
   - For each enabled channel (email/whatsapp/telegram):
-    - Check ReminderHistory for existing (account, day, channel, slot_hour)
+    - Check ReminderHistory for existing (account, cycle_start=last_trade_date, day, channel, slot_hour)
     - If missing, create ReminderHistory(status=pending), send via SENDERS[channel]()
     - On success: status=sent, log info, increment sent_count
     - On no-credentials: status=skipped, log warning (don't retry)
@@ -124,7 +134,7 @@ check_and_send_reminders():
 - Legal pages (terms, privacy, contact)
 - Production security (HTTPS, cookies, HSTS, headers)
 - Admin interface
-- Test suite (all passing)
+- Test suite (88 passing)
 
 ### Known Limitations (Not Next Features, Just Context)
 - **WhatsApp:** Currently hidden in UI (Twilio wired but needs phone validation)
@@ -213,7 +223,7 @@ python manage.py set_telegram_webhook
 ## Architecture Notes
 
 - **Timezone correctness:** All inactivity counting done in user's local TZ (not UTC). This is crucial for global users.
-- **Deduplication:** Unique constraint + IntegrityError catch prevents double-sends even with concurrent cron workers.
+- **Deduplication:** Unique constraint + IntegrityError catch prevents double-sends even with concurrent cron workers. Scoped per cycle (`cycle_start`) so reminders restart after each new trade.
 - **Grace window:** Late cron runs (up to 3 hours) still deliver reminders, avoiding missed notifications.
 - **Later-in-day skip rule:** If user trades after the 9 AM slot, the 2 PM slot is skipped same day.
 - **Webhook security:** Telegram webhook signed with `TELEGRAM_WEBHOOK_SECRET`.
@@ -222,7 +232,7 @@ python manage.py set_telegram_webhook
 
 ## Next-Session Entry Point
 
-1. **Check git log:** `git log --oneline -5` (last work on Sept 15)
+1. **Check git log:** `git log --oneline -5` (last work on 2026-11-18)
 2. **Review feature request:** If expanding reminder rules or adding reset/payout, read "Next Feature" above
 3. **Run tests:** `pytest -v` (ensure everything still passes)
 4. **Start dev server:** `python manage.py runserver`
