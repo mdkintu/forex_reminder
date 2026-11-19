@@ -1,6 +1,6 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-19 | **Git SHA:** `61ca270` (roadmap phases 1–5 done and deployed)
+**Last updated:** 2026-11-20 | **Git SHA:** `4263515` (code deployed at `61ca270`; later commits are docs only)
 
 ---
 
@@ -12,7 +12,7 @@
 - **Cron:** hourly `send_reminders >> reminders.log` (unchanged). Dry run on 2026-11-18 showed accounts #4/#5 due a day-15 catch-up at 14:00 EAT.
 - **Daily admin report:** `admin@fair.tergym.com` is the only superuser and has no Telegram connected, and the owner wants to keep it that way. So the report needs `ADMIN_TELEGRAM_CHAT_ID=<owner's existing chat id>` in the server `.env` (otherwise it falls back to emailing admin@fair.tergym.com). Check: `python manage.py shell -c "from trades.reporting import report_recipients; print(report_recipients())"`.
 
-### Still to verify on the server
+### Still to verify on the server (no results reported yet as of 2026-11-20)
 - [ ] `ADMIN_TELEGRAM_CHAT_ID` added to `.env` and the first daily report arrives (after 06:00 UTC / 09:00 EAT).
 - [ ] `reminders.log` shows the catch-up sends for accounts #4/#5.
 - [ ] Email delivery: history so far shows only Telegram rows; use **Send me a test reminder** on the profile page.
