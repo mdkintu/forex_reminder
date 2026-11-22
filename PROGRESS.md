@@ -74,6 +74,11 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - Per-user send hours: `User.reminder_hours` (≤3, profile checkboxes 06–22) via `User.get_reminder_hours()` in the task, next-reminder time and labels.
 - **Deploy:** `git pull`, `migrate` (accounts 0007, trades 0009), restart.
 
+### Telegram: pick the date & time of a trade ✅ (2026-11-22, not yet deployed)
+- `/traded` with one account now asks **[✅ Just now] [🕒 Pick date & time]** instead of recording at once; the multi-account list has both per account; reminders get a third button "🕒 Traded earlier…".
+- Picker (`accounts/telegram_bot.py`): last 7 days → hour → minutes (5-min steps), in the user's timezone, future times hidden and rejected server-side. Stateless callbacks: `pick:<pk>[:<YYYYMMDD>[:<HH>]]`, `at:<pk>:<YYYYMMDD>:<HHMM>`, `menu:<pk>` (back), `noop` (header labels). Swaps only the buttons (`trades.notifications.edit_message_buttons`), so reminder text is kept; the final tap appends the confirmation like "I traded" does. Older dates: use the website.
+- **Deploy:** `git pull` + restart only (no migration; `callback_query` is already registered, so no `set_telegram_webhook` re-run).
+
 ### Deploy everything at once (phases 1–5)
 `git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, optionally add `HEALTHCHECK_PING_URL` to `.env`, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
 

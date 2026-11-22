@@ -182,3 +182,25 @@ def edit_message_text(chat_id, message_id, text: str) -> object | None:
     return _run_bot(
         lambda bot: bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
     )
+
+
+def edit_message_buttons(chat_id, message_id, buttons) -> object | None:
+    """Replace only the inline buttons of a message, keeping its text.
+
+    ``buttons`` uses the same rows-of-``(label, callback_data)`` shape as
+    :func:`send_telegram_message`. A double tap that would set the same
+    buttons again ("message is not modified") is logged, not raised.
+    """
+    import telegram
+
+    try:
+        return _run_bot(
+            lambda bot: bot.edit_message_reply_markup(
+                chat_id=chat_id, message_id=message_id, reply_markup=_keyboard(buttons)
+            )
+        )
+    except telegram.error.BadRequest as exc:
+        if "not modified" not in str(exc).lower():
+            raise
+        logger.info("[notifications][telegram] Buttons unchanged for msg %s.", message_id)
+        return None

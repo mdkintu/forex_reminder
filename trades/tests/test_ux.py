@@ -178,6 +178,7 @@ def test_telegram_reminder_offers_snooze(user):
         tasks._send_telegram(acct, 10)
     datas = [d for row in send.call_args.kwargs["buttons"] for _, d in row]
     assert f"snooze:{acct.pk}:1" in datas
+    assert f"pick:{acct.pk}" in datas  # "🕒 Traded earlier…" opens the date & time picker
 
 
 # --- per-user send hours ---------------------------------------------------

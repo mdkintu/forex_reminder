@@ -5,13 +5,23 @@ Supported:
 * ``/start <token>`` — the one-tap "Connect Telegram" flow (links this chat to
   the FAIR user the token belongs to).
 * ``/status`` — each account's days left and next reminder, most urgent first.
-* ``/traded [name or account #]`` — record a trade now. With one account (or
-  an unambiguous match) it's marked immediately; otherwise the bot replies
-  with one button per account.
+* ``/traded [name or account #]`` — record a trade. With one account (or an
+  unambiguous match) the bot asks "Just now" or "Pick date & time";
+  otherwise it replies with those two choices for every account.
 * ``/help``.
-* Inline-button taps (``callback_query``): ``traded:<account pk>`` (sent on
-  every Telegram reminder and by ``/traded``) and ``snooze:<pk>:<days>``
-  (the reminder's "Snooze 1 day" button).
+* Inline-button taps (``callback_query``), all checked against the chat that
+  owns the account:
+
+  - ``traded:<pk>`` — record a trade now (on every Telegram reminder too).
+  - ``snooze:<pk>:<days>`` — the reminder's "Snooze 1 day" button.
+  - ``pick:<pk>[:<YYYYMMDD>[:<HH>]]`` — the date & time picker, one step per
+    tap (day → hour → minutes), in the user's own timezone. It swaps the
+    message's buttons and leaves its text alone.
+  - ``at:<pk>:<YYYYMMDD>:<HHMM>`` — record the trade at that local time.
+  - ``menu:<pk>`` — back from the picker to "Just now / Pick date & time".
+  - ``noop`` — the picker's header labels; only stops the spinner.
+
+  The picker keeps no state: everything it needs is in the button's data.
 
 Only chats linked to a FAIR user can see or change that user's accounts.
 Plain (non-command) messages are ignored. :func:`handle_update` is called by
@@ -19,12 +29,14 @@ Plain (non-command) messages are ignored. :func:`handle_update` is called by
 """
 
 import logging
+from datetime import datetime, timedelta
 
 from django.utils import timezone
 
 from trades.models import SNOOZE_DAYS, TradingAccount
 from trades.notifications import (
     answer_callback_query,
+    edit_message_buttons,
     edit_message_text,
     send_telegram_message,
 )
@@ -36,10 +48,11 @@ logger = logging.getLogger(__name__)
 HELP_TEXT = (
     "FAIR — Forex Account Inactivity Reminder\n\n"
     "/status — days left on each account\n"
-    "/traded — record a trade now (resets the countdown)\n"
+    "/traded — record a trade, just now or at a date & time you pick "
+    "(resets the countdown)\n"
     "/traded <name or account #> — for a specific account\n"
     "/help — this message\n\n"
-    "Reminders also have an \"✅ I traded\" button."
+    "Reminders also have \"✅ I traded\" and \"🕒 Traded earlier…\" buttons."
 )
 
 NOT_LINKED_TEXT = (
@@ -47,12 +60,24 @@ NOT_LINKED_TEXT = (
     "page and tap “Connect Telegram” to connect it."
 )
 
+INVALID_BUTTON_TEXT = "This button isn't valid for this chat."
+INVALID_TIME_TEXT = "That date/time isn't available (it may be in the future). Pick again."
+
 #: Bot command menu registered by ``set_telegram_webhook``.
 COMMANDS = [
     ("status", "Days left on each account"),
     ("traded", "Record a trade now (resets the countdown)"),
     ("help", "How to use this bot"),
 ]
+
+#: Callback actions that act on one of the user's accounts (``<action>:<pk>…``).
+ACCOUNT_ACTIONS = ("traded", "snooze", "pick", "at", "menu")
+#: Callback data of the picker's header labels.
+NOOP = "noop"
+#: How many days back the picker offers (today included).
+PICK_DAYS = 7
+#: Minute buttons are offered in steps of this many minutes.
+MINUTE_STEP = 5
 
 
 def handle_update(update: dict) -> None:
@@ -157,6 +182,11 @@ def _status_text(user):
 
 def _traded_confirmation(account):
     local = timezone.localtime(account.last_trade_date, account.user.get_timezone())
+    if account.is_inactive:
+        return (
+            f"⚠️ '{account.account_name}': last trade recorded at {local:%b %d, %H:%M}, "
+            f"which is already past its {account.inactivity_days}-day limit."
+        )
     return (
         f"✅ '{account.account_name}' reset — last trade recorded at "
         f"{local:%b %d, %H:%M}. Next reminder: {account.next_reminder_label}."
@@ -172,6 +202,11 @@ def _match(accounts, arg):
     return [a for a in accounts if needle in a.account_name.lower()]
 
 
+def _now_buttons(account):
+    """The "when did you trade?" choice for one account."""
+    return [[("✅ Just now", f"traded:{account.pk}"), ("🕒 Pick date & time", f"pick:{account.pk}")]]
+
+
 def _handle_traded(chat_id, user, arg):
     accounts = _accounts(user)
     if not accounts:
@@ -181,16 +216,131 @@ def _handle_traded(chat_id, user, arg):
     candidates = _match(accounts, arg) if arg else accounts
     if len(candidates) == 1:
         account = candidates[0]
-        account.mark_traded()
-        send_telegram_message(chat_id, _traded_confirmation(account))
+        send_telegram_message(
+            chat_id,
+            f"When did you trade on '{account.account_name}'?",
+            buttons=_now_buttons(account),
+        )
         return
 
     if not candidates:  # nothing matched: offer them all
         candidates = accounts
     send_telegram_message(
         chat_id,
-        "Which account did you trade on?",
-        buttons=[[(f"✅ {a.account_name}", f"traded:{a.pk}")] for a in candidates],
+        "Which account did you trade on? ✅ = just now, 🕒 = pick the date & time.",
+        buttons=[
+            [(f"✅ {a.account_name}", f"traded:{a.pk}"), ("🕒 Pick time", f"pick:{a.pk}")]
+            for a in candidates
+        ],
+    )
+
+
+# --- the date & time picker ---------------------------------------------------
+
+
+def _local_now(account):
+    return timezone.localtime(timezone.now(), account.user.get_timezone())
+
+
+def _parse_day(value):
+    """``"YYYYMMDD"`` -> ``date``, or None."""
+    if len(value) != 8 or not value.isdigit():
+        return None
+    try:
+        return datetime.strptime(value, "%Y%m%d").date()
+    except ValueError:
+        return None
+
+
+def _at(day, hour, minute, tz):
+    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=tz)
+
+
+def _rows(buttons, size):
+    return [buttons[i:i + size] for i in range(0, len(buttons), size)]
+
+
+def _day_label(day, today):
+    if day == today:
+        return "Today"
+    if day == today - timedelta(days=1):
+        return "Yesterday"
+    return f"{day:%a %d}"
+
+
+def _day_buttons(account, now):
+    today = now.date()
+    days = [today - timedelta(days=n) for n in range(PICK_DAYS)]
+    choices = [(_day_label(d, today), f"pick:{account.pk}:{d:%Y%m%d}") for d in days]
+    return (
+        [[(f"📅 Day you traded on '{account.account_name}' ({now.tzinfo})", NOOP)]]
+        + [choices[:2]]
+        + _rows(choices[2:], 3)
+        + [[("« Back", f"menu:{account.pk}")]]
+    )
+
+
+def _hour_buttons(account, day, now):
+    last = now.hour if day == now.date() else 23
+    hours = [(f"{h:02d}", f"pick:{account.pk}:{day:%Y%m%d}:{h:02d}") for h in range(last + 1)]
+    return (
+        [[(f"🗓 {day:%a %d %b} — pick the hour", NOOP)]]
+        + _rows(hours, 6)
+        + [[("« Back", f"pick:{account.pk}")]]
+    )
+
+
+def _minute_buttons(account, day, hour, now):
+    last = now.minute if (day, hour) == (now.date(), now.hour) else 59
+    minutes = [
+        (f":{m:02d}", f"at:{account.pk}:{day:%Y%m%d}:{hour:02d}{m:02d}")
+        for m in range(0, last + 1, MINUTE_STEP)
+    ]
+    return (
+        [[(f"🗓 {day:%a %d %b}, {hour:02d}:__ — pick the minutes", NOOP)]]
+        + _rows(minutes, 6)
+        + [[("« Back", f"pick:{account.pk}:{day:%Y%m%d}")]]
+    )
+
+
+def _pick_buttons(account, args, now):
+    """Buttons for the picker step named by ``args``; None if invalid or in the future."""
+    if not args:
+        return _day_buttons(account, now)
+    day = _parse_day(args[0])
+    if day is None or day > now.date() or len(args) > 2:
+        return None
+    if len(args) == 1:
+        return _hour_buttons(account, day, now)
+    hour = int(args[1]) if args[1].isdigit() else 99
+    if hour > 23 or _at(day, hour, 0, now.tzinfo) > now:
+        return None
+    return _minute_buttons(account, day, hour, now)
+
+
+def _parse_when(args, tz):
+    """``["YYYYMMDD", "HHMM"]`` -> aware datetime in ``tz``, or None."""
+    if len(args) != 2:
+        return None
+    day, hhmm = _parse_day(args[0]), args[1]
+    if day is None or len(hhmm) != 4 or not hhmm.isdigit():
+        return None
+    hour, minute = int(hhmm[:2]), int(hhmm[2:])
+    if hour > 23 or minute > 59:
+        return None
+    return _at(day, hour, minute, tz)
+
+
+# --- inline-button taps -------------------------------------------------------
+
+
+def _append_confirmation(chat_id, message, confirmation):
+    """Add ``confirmation`` under the tapped message's text (drops its buttons)."""
+    original = message.get("text") or ""
+    edit_message_text(
+        chat_id,
+        message.get("message_id"),
+        f"{original}\n\n{confirmation}" if original else confirmation,
     )
 
 
@@ -200,37 +350,61 @@ def _handle_callback(query):
     message = query.get("message") or {}
     chat_id = message.get("chat", {}).get("id") or query.get("from", {}).get("id")
 
+    if data == NOOP:  # a picker header label: nothing to do
+        answer_callback_query(query_id)
+        return
+
     action, *params = data.split(":")
-    pk = params[0] if params else ""
+    pk, args = (params[0], params[1:]) if params else ("", [])
     account = None
-    if action in ("traded", "snooze") and pk.isdigit() and chat_id:
+    if action in ACCOUNT_ACTIONS and pk.isdigit() and chat_id:
         # Only the owner's linked chat may act on the account.
         account = (
             TradingAccount.objects.select_related("user")
             .filter(pk=int(pk), user__telegram_chat_id=str(chat_id))
             .first()
         )
-
-    days = int(params[1]) if action == "snooze" and len(params) > 1 and params[1].isdigit() else None
-    if account is None or (action == "snooze" and days not in SNOOZE_DAYS):
-        answer_callback_query(query_id, "This button isn't valid for this chat.")
+    if account is None:
+        answer_callback_query(query_id, INVALID_BUTTON_TEXT)
         return
 
-    if action == "snooze":
-        account.snooze(days)
-        answer_callback_query(query_id, f"Snoozed for {days} day(s) 💤")
-        local = timezone.localtime(account.snoozed_until, account.user.get_timezone())
-        confirmation = (
-            f"💤 Snoozed until {local:%b %d, %H:%M}. The final reminder before "
-            "the deadline still comes through."
-        )
-    else:
+    if action == "traded":
         account.mark_traded()
         answer_callback_query(query_id, "Countdown reset ✅")
-        confirmation = _traded_confirmation(account)
-    original = message.get("text") or ""
-    edit_message_text(
+        _append_confirmation(chat_id, message, _traded_confirmation(account))
+    elif action == "snooze":
+        _handle_snooze(query_id, chat_id, message, account, args)
+    elif action == "menu":
+        answer_callback_query(query_id)
+        edit_message_buttons(chat_id, message.get("message_id"), _now_buttons(account))
+    elif action == "pick":
+        buttons = _pick_buttons(account, args, _local_now(account))
+        if buttons is None:
+            answer_callback_query(query_id, INVALID_TIME_TEXT)
+            return
+        answer_callback_query(query_id)
+        edit_message_buttons(chat_id, message.get("message_id"), buttons)
+    else:  # "at"
+        when = _parse_when(args, account.user.get_timezone())
+        if when is None or when > timezone.now():
+            answer_callback_query(query_id, INVALID_TIME_TEXT)
+            return
+        account.mark_traded(when)
+        answer_callback_query(query_id, "Trade recorded ✅")
+        _append_confirmation(chat_id, message, _traded_confirmation(account))
+
+
+def _handle_snooze(query_id, chat_id, message, account, args):
+    days = int(args[0]) if args and args[0].isdigit() else None
+    if days not in SNOOZE_DAYS:
+        answer_callback_query(query_id, INVALID_BUTTON_TEXT)
+        return
+    account.snooze(days)
+    answer_callback_query(query_id, f"Snoozed for {days} day(s) 💤")
+    local = timezone.localtime(account.snoozed_until, account.user.get_timezone())
+    _append_confirmation(
         chat_id,
-        message.get("message_id"),
-        f"{original}\n\n{confirmation}" if original else confirmation,
+        message,
+        f"💤 Snoozed until {local:%b %d, %H:%M}. The final reminder before "
+        "the deadline still comes through.",
     )

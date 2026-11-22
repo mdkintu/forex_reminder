@@ -89,7 +89,10 @@ def _send_telegram(account, day_number, missed=False):
     return send_telegram_message(
         account.user.telegram_chat_id,
         _chat_text(account, day_number, missed),
-        buttons=[[("✅ I traded", f"traded:{account.pk}"), ("💤 Snooze 1 day", f"snooze:{account.pk}:1")]],
+        buttons=[
+            [("✅ I traded", f"traded:{account.pk}"), ("💤 Snooze 1 day", f"snooze:{account.pk}:1")],
+            [("🕒 Traded earlier…", f"pick:{account.pk}")],
+        ],
     )
 
 
