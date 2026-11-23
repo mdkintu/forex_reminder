@@ -5,6 +5,8 @@ from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
 
+from trades.api import mt5_sync
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     # django-allauth handles auth (login, signup, logout, password reset, etc.)
@@ -14,6 +16,8 @@ urlpatterns = [
     # authenticated users.
     path("", include("accounts.urls")),
     path("trades/", include("trades.urls")),
+    # Called by the FAIR Sync MT5 Expert Advisor (mt5/FAIR_Sync.mq5).
+    path("api/mt5/sync/", mt5_sync, name="mt5_sync"),
 ]
 
 if settings.DEBUG:

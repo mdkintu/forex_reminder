@@ -102,6 +102,15 @@ def profile(request):
         )
         return redirect("accounts:profile")
 
+    if request.method == "POST" and "regenerate_mt5_key" in request.POST:
+        request.user.regenerate_mt5_sync_key()
+        messages.success(
+            request,
+            "New MT5 sync key created. EAs using the old key stop syncing — "
+            "download the FAIR Sync EA again and replace it in MT5.",
+        )
+        return redirect(reverse("accounts:profile") + "#mt5")
+
     if request.method == "POST" and "disconnect_telegram" in request.POST:
         request.user.telegram_chat_id = ""
         request.user.save(update_fields=["telegram_chat_id"])
@@ -156,8 +165,29 @@ def profile(request):
             "calendar_url": request.build_absolute_uri(
                 reverse("accounts:calendar_feed", args=[request.user.get_or_create_calendar_token()])
             ),
+            "mt5_sync_key": request.user.get_or_create_mt5_sync_key(),
         },
     )
+
+
+#: The FAIR Sync Expert Advisor source; its two placeholders are filled in
+#: per user by :func:`mt5_ea`.
+MT5_EA_PATH = settings.BASE_DIR / "mt5" / "FAIR_Sync.mq5"
+
+
+@login_required
+def mt5_ea(request):
+    """Download FAIR_Sync.mq5 with this site's sync URL and the user's sync
+    key pre-filled, so nothing has to be typed into MT5."""
+    sync_url = f"{settings.SITE_SCHEME}://{settings.SITE_DOMAIN}{reverse('mt5_sync')}"
+    source = MT5_EA_PATH.read_text(encoding="utf-8")
+    body = source.replace("__FAIR_URL__", sync_url).replace(
+        "__FAIR_KEY__", request.user.get_or_create_mt5_sync_key()
+    )
+    response = HttpResponse(body, content_type="text/plain; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="FAIR_Sync.mq5"'
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 def calendar_feed(request, token):

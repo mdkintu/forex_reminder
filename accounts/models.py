@@ -76,6 +76,10 @@ class User(AbstractUser):
     # Secret token in the user's private calendar-feed URL (.ics). Generated
     # on first use; regenerating it revokes the old URL.
     calendar_token = models.CharField(max_length=43, blank=True, db_index=True)
+    # Secret key the FAIR Sync MT5 Expert Advisor sends (Bearer header) to
+    # report trades (trades.api.mt5_sync). Generated on first use;
+    # regenerating it disconnects every EA using the old key.
+    mt5_sync_key = models.CharField(max_length=43, blank=True, db_index=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []  # Email is already required via USERNAME_FIELD
@@ -123,6 +127,16 @@ class User(AbstractUser):
         self.calendar_token = secrets.token_urlsafe(32)
         self.save(update_fields=["calendar_token"])
         return self.calendar_token
+
+    def get_or_create_mt5_sync_key(self) -> str:
+        if not self.mt5_sync_key:
+            self.regenerate_mt5_sync_key()
+        return self.mt5_sync_key
+
+    def regenerate_mt5_sync_key(self) -> str:
+        self.mt5_sync_key = secrets.token_urlsafe(32)
+        self.save(update_fields=["mt5_sync_key"])
+        return self.mt5_sync_key
 
     def get_or_create_telegram_link_token(self) -> str:
         """A valid token for the "Connect Telegram" deep link, generating a

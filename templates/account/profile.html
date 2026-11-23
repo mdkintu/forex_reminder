@@ -102,6 +102,42 @@
 
             <hr class="my-4">
 
+            <h2 class="h6 fw-semibold mb-2" id="mt5">MT5 auto-sync</h2>
+            <p class="text-secondary small mb-2">
+                The FAIR Sync Expert Advisor records each new trade's <strong>open time</strong>
+                automatically, so the countdown resets without tapping “I traded”. It only reads
+                your trade history: it can't place, change or close trades.
+            </p>
+            <ol class="text-secondary small ps-3 mb-2">
+                <li>On a Windows PC or VPS that stays on, open a <strong>separate</strong> MT5 and log in
+                    with the account's <strong>investor (read-only) password</strong>. One MT5 per account.</li>
+                <li>In that MT5: Tools › Options › Expert Advisors, tick “Allow WebRequest for listed URL”
+                    and add <code>{{ site_url }}</code>. Leave Algo Trading off.</li>
+                <li>Download the EA below, open it in MetaEditor, compile (F7), then drag
+                    <em>FAIR_Sync</em> onto any chart.</li>
+                <li>Make sure each account's <em>Account number</em> on FAIR is its MT5 login.</li>
+            </ol>
+            <p class="small text-warning-emphasis mb-2">
+                FundedNext CFD accounts of $50k and above don't allow EAs or automated tools. Run
+                FAIR Sync only in the investor-password MT5 from step 1, never in the one you trade
+                in, and check your firm's rules if unsure.
+            </p>
+            <a class="btn btn-outline-primary btn-sm mb-2" href="{% url 'accounts:mt5_ea' %}">Download FAIR Sync EA</a>
+            <details class="small mb-2">
+                <summary class="text-secondary">Show sync key</summary>
+                <input type="text" class="form-control form-control-sm mt-2" readonly value="{{ mt5_sync_key }}" aria-label="MT5 sync key">
+                <div class="text-secondary mt-1">Already filled in inside the downloaded EA. Keep it private.</div>
+            </details>
+            <form method="post" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" name="regenerate_mt5_key" value="1" class="btn btn-outline-secondary btn-sm">
+                    New key
+                </button>
+                <span class="text-secondary small ms-1">Disconnects EAs using the old key; download the EA again.</span>
+            </form>
+
+            <hr class="my-4">
+
             <h2 class="h6 fw-semibold mb-2">Check delivery</h2>
             <p class="text-secondary small mb-2">
                 Sends a test message by email{% if user.telegram_chat_id %} and Telegram{% endif %}

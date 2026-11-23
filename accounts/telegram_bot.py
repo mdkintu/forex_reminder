@@ -158,15 +158,21 @@ def _handle_start(chat_id, token):
 # --- /status ----------------------------------------------------------------
 
 
+def _mt5_suffix(account):
+    if not account.mt5_last_seen:
+        return ""
+    return " · MT5 quiet" if account.mt5_sync_quiet else " · MT5 ✓"
+
+
 def _status_line(account):
     if account.is_inactive:
-        return f"• {account.account_name}: ⛔ past its {account.inactivity_days}-day limit"
+        return f"• {account.account_name}: ⛔ past its {account.inactivity_days}-day limit{_mt5_suffix(account)}"
     days = account.days_remaining
     plural = "day" if days == 1 else "days"
     return (
         f"• {account.account_name}: {days} {plural} left "
         f"(day {account.days_since_last_trade}) — next reminder: "
-        f"{account.next_reminder_label}"
+        f"{account.next_reminder_label}{_mt5_suffix(account)}"
     )
 
 

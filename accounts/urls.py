@@ -10,6 +10,7 @@ urlpatterns = [
     path("profile/", views.profile, name="profile"),
     path("profile/test-reminder/", views.test_reminder, name="test_reminder"),
     path("calendar/<str:token>.ics", views.calendar_feed, name="calendar_feed"),
+    path("profile/mt5/FAIR_Sync.mq5", views.mt5_ea, name="mt5_ea"),
     path("privacy/", views.privacy, name="privacy"),
     path("terms/", views.terms, name="terms"),
     path("contact/", views.contact, name="contact"),

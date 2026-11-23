@@ -356,3 +356,17 @@ def test_set_webhook_registers_callbacks_and_commands(settings):
     assert set(kwargs["allowed_updates"]) == {"message", "callback_query"}
     commands = [c.command for c in inst.set_my_commands.call_args.args[0]]
     assert {"status", "traded", "help"} <= set(commands)
+
+
+@pytest.mark.django_db
+def test_status_shows_mt5_sync_state(client, user, bot):
+    fresh = _acct(user, "Fresh", 5)
+    quiet = _acct(user, "Quiet", 6)
+    _acct(user, "Manual", 7)
+    TradingAccount.objects.filter(pk=fresh.pk).update(mt5_last_seen=timezone.now())
+    TradingAccount.objects.filter(pk=quiet.pk).update(mt5_last_seen=timezone.now() - timedelta(days=2))
+    _post(client, _msg("/status"))
+    lines = {line.split(":")[0]: line for line in bot["send"].call_args.args[1].splitlines() if line.startswith("•")}
+    assert lines["• Fresh"].endswith("· MT5 ✓")
+    assert lines["• Quiet"].endswith("· MT5 quiet")
+    assert "MT5" not in lines["• Manual"]

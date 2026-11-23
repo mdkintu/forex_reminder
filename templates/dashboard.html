@@ -45,6 +45,13 @@
                                         {% elif account.snoozed_until and account.is_snoozed %}
                                             <div class="small text-secondary">💤 Snoozed until {{ account.snoozed_until|date:"M j, H:i" }}</div>
                                         {% endif %}
+                                        {% if account.mt5_last_seen %}
+                                            {% if account.mt5_sync_quiet %}
+                                                <div class="small text-warning-emphasis">🔌 MT5 sync quiet since {{ account.mt5_last_seen|date:"M j, H:i" }}</div>
+                                            {% else %}
+                                                <div class="small text-secondary">🔄 MT5 sync · checked in {{ account.mt5_last_seen|timesince }} ago</div>
+                                            {% endif %}
+                                        {% endif %}
                                         <div class="small text-success">
                                             ⏰ Next reminder:
                                             <span class="clock-reminder"

@@ -201,3 +201,44 @@ def test_disconnect_telegram_clears_chat_id(authenticated_client, user):
     assert response.status_code == 302
     user.refresh_from_db()
     assert user.telegram_chat_id == ""
+
+
+# --- MT5 auto-sync: profile card and EA download ------------------------------
+
+
+@pytest.mark.django_db
+def test_profile_shows_mt5_card_with_key(authenticated_client, user):
+    response = authenticated_client.get(reverse("accounts:profile"))
+    user.refresh_from_db()
+    html = response.content.decode()
+    assert user.mt5_sync_key and user.mt5_sync_key in html
+    assert reverse("accounts:mt5_ea") in html
+
+
+@pytest.mark.django_db
+def test_regenerate_mt5_key(authenticated_client, user):
+    old = user.get_or_create_mt5_sync_key()
+    response = authenticated_client.post(reverse("accounts:profile"), {"regenerate_mt5_key": "1"})
+    assert response.status_code == 302 and response["Location"].endswith("#mt5")
+    user.refresh_from_db()
+    assert user.mt5_sync_key and user.mt5_sync_key != old
+
+
+@pytest.mark.django_db
+def test_mt5_ea_download_is_prefilled(authenticated_client, user, settings):
+    settings.SITE_SCHEME, settings.SITE_DOMAIN = "https", "fair.example.com"
+    response = authenticated_client.get(reverse("accounts:mt5_ea"))
+    assert response.status_code == 200
+    assert 'filename="FAIR_Sync.mq5"' in response["Content-Disposition"]
+    body = response.content.decode()
+    user.refresh_from_db()
+    assert f'"https://fair.example.com{reverse("mt5_sync")}"' in body
+    assert f'"{user.mt5_sync_key}"' in body
+    assert "__FAIR_URL__" not in body and "__FAIR_KEY__" not in body
+    assert "OnTradeTransaction" in body
+
+
+def test_mt5_ea_download_requires_login(client):
+    response = client.get(reverse("accounts:mt5_ea"))
+    assert response.status_code == 302
+    assert "/login" in response["Location"]

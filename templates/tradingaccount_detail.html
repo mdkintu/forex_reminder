@@ -71,6 +71,17 @@
                         <dt class="col-sm-5">Last trade</dt>
                         <dd class="col-sm-7">{{ account.last_trade_date|date:"M j, Y H:i" }}</dd>
 
+                        <dt class="col-sm-5">MT5 sync</dt>
+                        <dd class="col-sm-7">
+                            {% if not account.mt5_last_seen %}
+                                <span class="text-secondary">Not set up · <a href="{% url 'accounts:profile' %}#mt5">how to connect MT5</a></span>
+                            {% elif account.mt5_sync_quiet %}
+                                <span class="text-warning-emphasis">🔌 Quiet since {{ account.mt5_last_seen|date:"M j, Y H:i" }}: check that the MT5 terminal with FAIR Sync is running</span>
+                            {% else %}
+                                🔄 Checked in {{ account.mt5_last_seen|timesince }} ago
+                            {% endif %}
+                        </dd>
+
                         <dt class="col-sm-5">Days since trade</dt>
                         <dd class="col-sm-7">{{ account.days_since_last_trade }}</dd>
 

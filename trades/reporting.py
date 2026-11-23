@@ -20,7 +20,7 @@ from django.core.mail import send_mail
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import ReminderHistory, ReminderRun, TradingAccount
+from .models import MT5_QUIET_HOURS, ReminderHistory, ReminderRun, TradingAccount
 from .notifications import send_telegram_message
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,33 @@ def build_daily_report(now=None) -> str:
             lines.append(f"  … and {len(risky) - AT_RISK_LIST_LIMIT} more")
     else:
         lines.append("✅ No account near its deadline is missing a reminder.")
+
+    quiet = quiet_mt5_accounts(now)
+    if quiet:
+        lines.append("")
+        lines.append(
+            f"🔌 {len(quiet)} account(s) with MT5 sync quiet for more than "
+            f"{MT5_QUIET_HOURS}h (terminal closed or EA removed?):"
+        )
+        for account in quiet[:AT_RISK_LIST_LIMIT]:
+            lines.append(
+                f"  • {account.account_name} ({account.user.email}) — last check-in "
+                f"{account.mt5_last_seen:%Y-%m-%d %H:%M} UTC"
+            )
+        if len(quiet) > AT_RISK_LIST_LIMIT:
+            lines.append(f"  … and {len(quiet) - AT_RISK_LIST_LIMIT} more")
     return "\n".join(lines)
+
+
+def quiet_mt5_accounts(now=None):
+    """Accounts that have synced from MT5 before but not in MT5_QUIET_HOURS,
+    longest-quiet first."""
+    cutoff = (now or timezone.now()) - timedelta(hours=MT5_QUIET_HOURS)
+    return list(
+        TradingAccount.objects.select_related("user")
+        .filter(mt5_last_seen__isnull=False, mt5_last_seen__lt=cutoff)
+        .order_by("mt5_last_seen")
+    )
 
 
 def report_recipients():

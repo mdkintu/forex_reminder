@@ -71,6 +71,10 @@ class ReminderSchedule(models.Model):
 #: Snooze lengths (days) offered in the UI and by the Telegram bot.
 SNOOZE_DAYS = (1, 3, 7)
 
+#: The MT5 EA sends a heartbeat every 15 minutes; after this many hours of
+#: silence an account's sync is shown as quiet (dashboard, /status, report).
+MT5_QUIET_HOURS = 24
+
 
 class TradingAccount(models.Model):
     """A user's forex trading account being monitored for inactivity."""
@@ -107,6 +111,9 @@ class TradingAccount(models.Model):
     )
     #: Reminders are paused until this time (see is_snoozed).
     snoozed_until = models.DateTimeField(null=True, blank=True)
+    #: Last time the FAIR Sync MT5 EA reported for this account (every report,
+    #: including heartbeats). None = never synced from MT5.
+    mt5_last_seen = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -299,6 +306,14 @@ class TradingAccount(models.Model):
     def is_inactive(self):
         """True when the account has crossed the inactivity threshold."""
         return self.days_since_last_trade >= self.inactivity_days
+
+    @property
+    def mt5_sync_quiet(self):
+        """True when the MT5 EA has synced this account before but hasn't
+        checked in for MT5_QUIET_HOURS (terminal closed, PC off, EA removed)."""
+        if not self.mt5_last_seen:
+            return False
+        return timezone.now() - self.mt5_last_seen > timezone.timedelta(hours=MT5_QUIET_HOURS)
 
     @property
     def deadline(self):

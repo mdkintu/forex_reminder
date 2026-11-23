@@ -1,6 +1,6 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-20 | **Git SHA:** `4263515` (code deployed at `61ca270`; later commits are docs only)
+**Last updated:** 2026-11-23 | **Git SHA:** `5f2654b` (server still at `61ca270`: the Telegram date & time picker is pushed to `main` but not yet pulled on the server)
 
 ---
 
@@ -34,7 +34,7 @@ Only a trade resets the count; logging in does not. Re-check firm rules periodic
 
 ## Roadmap (plan approved 2026-11-18)
 
-Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram buttons/commands), 3 per-account inactivity limits + reminders as "days left", 4 reliable delivery (retries, catch-up, test reminder), 5 UX (urgency dashboard, .ics feed, snooze, per-user send hours). Deferred: MT4/MT5 auto-sync. WhatsApp stays hidden.
+Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram buttons/commands), 3 per-account inactivity limits + reminders as "days left", 4 reliable delivery (retries, catch-up, test reminder), 5 UX (urgency dashboard, .ics feed, snooze, per-user send hours). MT5 auto-sync: see "MT5 auto-sync" below (MT4 not done). WhatsApp stays hidden.
 
 ### Phase 1: health monitoring ✅ (deployed 2026-11-18)
 - `send_reminders --dry-run`: per-account decision + reason, sends nothing.
@@ -74,10 +74,19 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - Per-user send hours: `User.reminder_hours` (≤3, profile checkboxes 06–22) via `User.get_reminder_hours()` in the task, next-reminder time and labels.
 - **Deploy:** `git pull`, `migrate` (accounts 0007, trades 0009), restart.
 
-### Telegram: pick the date & time of a trade ✅ (2026-11-22, not yet deployed)
+### Telegram: pick the date & time of a trade ✅ (2026-11-22, pushed to main as `5f2654b`; server pull + restart pending)
 - `/traded` with one account now asks **[✅ Just now] [🕒 Pick date & time]** instead of recording at once; the multi-account list has both per account; reminders get a third button "🕒 Traded earlier…".
 - Picker (`accounts/telegram_bot.py`): last 7 days → hour → minutes (5-min steps), in the user's timezone, future times hidden and rejected server-side. Stateless callbacks: `pick:<pk>[:<YYYYMMDD>[:<HH>]]`, `at:<pk>:<YYYYMMDD>:<HHMM>`, `menu:<pk>` (back), `noop` (header labels). Swaps only the buttons (`trades.notifications.edit_message_buttons`), so reminder text is kept; the final tap appends the confirmation like "I traded" does. Older dates: use the website.
 - **Deploy:** `git pull` + restart only (no migration; `callback_query` is already registered, so no `set_telegram_webhook` re-run).
+
+### MT5 auto-sync ✅ (2026-11-22, committed 2026-11-23 on branch `mt5-auto-sync`; not yet merged to main or deployed)
+- **What:** the FAIR Sync Expert Advisor (`mt5/FAIR_Sync.mq5`) reports each account's newest trade **open** time; FAIR restarts the countdown from it. Closes are ignored on purpose: firms reset inactivity when a trade is *placed*, so counting from a close could show more days left than the firm gives.
+- **Why an EA in an investor-password terminal:** MT5 has no public web API and cPanel can't run MT5, so data has to come from a terminal the user runs (Windows PC/VPS). **FundedNext CFD ≥ $50k bans EAs/"any automated tools"** (help article 8020763), so the EA runs in a *separate* MT5 logged in with the **investor (read-only) password**, Algo Trading off; it has no trade calls. Cloud services (MetaApi) avoided: shared IPs can trip FundedNext's group-trading/IP checks. Trades placed from phone/other PCs are still seen (history comes from the broker's server).
+- **EA:** on start, on every new deal (`OnTradeTransaction`) and every 15 min (heartbeat) it finds the newest BUY/SELL deal with entry IN/INOUT, converts server time → UTC (`TimeTradeServer()-TimeGMT()` rounded to 15 min) and POSTs `{"login","server","last_open_utc","deal","ea"}` to `/api/mt5/sync/` with the key in `Authorization: Bearer` **and** `X-FAIR-Key` (some Apache/cPanel setups drop Authorization). Prints clear errors to the Experts tab (4014 = add the site under "Allow WebRequest"). One terminal per account.
+- **Server (`trades/api.py`, `mt5_sync`):** key → `User.mt5_sync_key`; login → that user's accounts with `account_number == login`; always sets `TradingAccount.mt5_last_seen`; moves `last_trade_date` **forward only** with a conditional UPDATE (an old/replayed report can't undo a newer trade recorded elsewhere), caps future times at now, clears snooze. 401 bad key, 400 bad body, 404 unknown login, 429 over 60/min per user.
+- **UI:** profile "MT5 auto-sync" card (setup steps, FundedNext warning, **Download FAIR Sync EA** = `accounts:mt5_ea`, pre-filled with the site URL + user's key; "Show sync key"; "New key"). Dashboard/detail show "🔄 MT5 sync · checked in … ago" or "🔌 quiet since …" (`TradingAccount.mt5_sync_quiet`, > `MT5_QUIET_HOURS`=24h); `/status` lines end "· MT5 ✓" / "· MT5 quiet"; the daily admin report lists quiet accounts (`trades.reporting.quiet_mt5_accounts`). No Telegram message per sync (silent by choice).
+- **Verified:** 247 tests pass; curl against a scratch-DB dev server: newer open → updated, older open/heartbeat → unchanged, wrong login → 404, bad key → 401. **Not yet verified:** compiling the EA in MetaEditor (needs Windows) and a live demo-account run.
+- **Deploy:** `git pull && python manage.py migrate` (accounts 0008, trades 0010) `&& touch tmp/restart.txt`. Then on Windows: profile → Download FAIR Sync EA → MetaEditor F7 → attach to a **demo** account first, open a trade, check FAIR's last trade time; then switch to the investor login on the real account. Set each account's *Account number* on FAIR to its MT5 login.
 
 ### Deploy everything at once (phases 1–5)
 `git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, optionally add `HEALTHCHECK_PING_URL` to `.env`, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
@@ -108,6 +117,7 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - Custom `AbstractUser` (email is USERNAME_FIELD, no username field)
 - Phone number, Telegram chat ID, timezone (auto-detected)
 - Telegram link token + expiry (30-min validity for one-tap "Connect Telegram" flow)
+- `mt5_sync_key` (Bearer key the FAIR Sync MT5 EA sends; regenerate on profile)
 - `get_timezone()`, `set_timezone_from_js()`, `get_or_create_telegram_link_token()`
 
 ### TradingAccount (trades/models.py)
@@ -123,6 +133,7 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
   - `is_inactive`: past the account's limit
   - `deadline`: last_trade_date + inactivity_days
   - `reminder_days()`, `snoozed_until`/`snooze()`, `mark_traded()`, `urgency`
+  - `mt5_last_seen` / `mt5_sync_quiet` (MT5 auto-sync heartbeat)
 
 ### ReminderSchedule (trades/models.py)
 - Singleton JSON field `days_left` (days before each account's deadline; default [20,15,5,4,3,2,1,0]; 0 = deadline day)
@@ -204,14 +215,14 @@ send_reminders command then: maybe_send_daily_report(), ping_healthcheck()
 - Legal pages (terms, privacy, contact)
 - Production security (HTTPS, cookies, HSTS, headers)
 - Admin interface
-- Test suite (191 passing)
+- Test suite (247 passing, incl. MT5 auto-sync)
 - Roadmap phases 1–5 (monitoring, one-tap traded, per-account limits, reliable delivery, UX)
 
 ### Known Limitations (Not Next Features, Just Context)
 - **WhatsApp:** Currently hidden in UI (Twilio wired but needs phone validation)
 - **Celery/Redis:** Optional; cron works fine without it
 - **Deadline-day reminder (0 days left):** days are compared by local calendar day, so it fires even if the exact deadline passed earlier that day
-- **MT4/MT5 auto-sync:** deferred; last trade date is still entered manually (or via one-tap "I traded")
+- **MT5 auto-sync:** needs an MT5 terminal you keep running (PC/VPS) with the FAIR Sync EA; without it, last trade date is entered manually (or via one-tap "I traded" / the Telegram picker). MT4 not supported.
 
 ### **Next Feature to Build: Account Reset / Payout Flow**
 The app currently monitors inactivity but lacks a "reset" workflow. After a user successfully completes a trading cycle (e.g., 30-day profit target), they should:
@@ -243,7 +254,8 @@ The app currently monitors inactivity but lacks a "reset" workflow. After a user
 | `accounts/models.py` | Custom User, timezone, Telegram token | ✅ Complete |
 | `templates/dashboard.html` | Account list with live countdown (JS tickers) | ✅ Complete |
 | `templates/tradingaccount_detail.html` | Account detail + reminder history + edit | ✅ Complete |
-| `accounts/views.py` | Auth, profile, Telegram webhook | ✅ Complete |
+| `accounts/views.py` | Auth, profile, Telegram webhook, MT5 EA download | ✅ Complete |
+| `trades/api.py` + `mt5/FAIR_Sync.mq5` | MT5 auto-sync endpoint + the Expert Advisor | ✅ Built (EA not yet compiled/run on Windows) |
 | `trades/views.py` | Account CRUD, reminder history view | ✅ Complete |
 | `forex_reminder/settings.py` | Django config, security, Celery | ✅ Complete |
 | `conftest.py` + test files | pytest fixtures, auth/CRUD/task tests | ✅ Complete |
