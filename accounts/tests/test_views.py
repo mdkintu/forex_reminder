@@ -216,6 +216,19 @@ def test_profile_shows_mt5_card_with_key(authenticated_client, user):
 
 
 @pytest.mark.django_db
+def test_profile_mt5_card_says_no_vps_and_flags_firm_rules(authenticated_client):
+    """Goat Funded Trader bans VPN/VPS/hosting (from 2026-10-06) and FundedNext
+    CFD $50k+ bans "any automated tools", so the setup steps must not suggest
+    a VPS and must send those traders to their firm first."""
+    html = authenticated_client.get(reverse("accounts:profile")).content.decode()
+    card = html[html.index('id="mt5"'):html.index(reverse("accounts:mt5_ea"))]
+    assert "PC or VPS" not in card
+    assert "not a VPS" in card
+    assert "Goat Funded Trader" in card
+    assert "$50k" in card and "in writing" in card
+
+
+@pytest.mark.django_db
 def test_regenerate_mt5_key(authenticated_client, user):
     old = user.get_or_create_mt5_sync_key()
     response = authenticated_client.post(reverse("accounts:profile"), {"regenerate_mt5_key": "1"})

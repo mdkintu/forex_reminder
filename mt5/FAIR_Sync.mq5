@@ -7,6 +7,10 @@
 //| READ-ONLY: it never opens, closes or modifies orders or trades.  |
 //| Leave "Algo Trading" OFF, and run it in a terminal logged in     |
 //| with the account's INVESTOR (read-only) password.                |
+//| Run it on your own computer (the one you trade from, or another  |
+//| on the same network), NOT a VPS: some prop firms ban or flag VPS |
+//| logins. Check your firm's EA rules first: FundedNext CFD $50k+   |
+//| bans "any automated tools", so ask them in writing.              |
 //|                                                                  |
 //| Setup                                                            |
 //|  1. Tools > Options > Expert Advisors: tick "Allow WebRequest    |

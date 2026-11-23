@@ -30,6 +30,18 @@
 
 Only a trade resets the count; logging in does not. Re-check firm rules periodically.
 
+### Firm rules that affect the FAIR Sync EA (checked 2026-11-23)
+FAIR Sync never trades, so no trade is ever tagged as coming from an EA. What a broker can see is the extra investor login and its IP, so run it on the trader's own computer or network, never a VPS.
+
+| Firm / account | Rule | FAIR Sync |
+|---|---|---|
+| FundedNext CFD < $50k | EAs/bots allowed; VPN/VPS allowed with conditions | OK |
+| FundedNext CFD ≥ $50k | No EAs, bots or "any automated tools" (even SL/TP/lot-size tools); VPN/VPS article applies only below $50k | Ask in writing first; until then use "I traded" |
+| Goat Funded Trader | Only self-written EAs (may ask for the code); from 2026-10-06 no VPN/VPS/proxy/hosting on any account | OK on own computer only |
+| The5ers | EAs allowed; banned: third-party EAs without source, copy trading (mostly third-party sources) | Likely OK; confirm |
+
+Support questions drafted 2026-11-23 for FundedNext (≥ $50k) and Goat Funded Trader; no answers yet.
+
 ---
 
 ## Roadmap (plan approved 2026-11-18)
@@ -81,11 +93,11 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 
 ### MT5 auto-sync ✅ (2026-11-22, committed 2026-11-23 on branch `mt5-auto-sync`; not yet merged to main or deployed)
 - **What:** the FAIR Sync Expert Advisor (`mt5/FAIR_Sync.mq5`) reports each account's newest trade **open** time; FAIR restarts the countdown from it. Closes are ignored on purpose: firms reset inactivity when a trade is *placed*, so counting from a close could show more days left than the firm gives.
-- **Why an EA in an investor-password terminal:** MT5 has no public web API and cPanel can't run MT5, so data has to come from a terminal the user runs (Windows PC/VPS). **FundedNext CFD ≥ $50k bans EAs/"any automated tools"** (help article 8020763), so the EA runs in a *separate* MT5 logged in with the **investor (read-only) password**, Algo Trading off; it has no trade calls. Cloud services (MetaApi) avoided: shared IPs can trip FundedNext's group-trading/IP checks. Trades placed from phone/other PCs are still seen (history comes from the broker's server).
+- **Why an EA in an investor-password terminal:** MT5 has no public web API and cPanel can't run MT5, so data has to come from a terminal the user runs on their own computer (Windows, or Linux/Mac with Wine), not a VPS (see "Firm rules that affect the FAIR Sync EA"). **FundedNext CFD ≥ $50k bans EAs/"any automated tools"** (help article 8020763), so the EA runs in a *separate* MT5 logged in with the **investor (read-only) password**, Algo Trading off; it has no trade calls. Cloud services (MetaApi) avoided: shared IPs can trip FundedNext's group-trading/IP checks. Trades placed from phone/other PCs are still seen (history comes from the broker's server).
 - **EA:** on start, on every new deal (`OnTradeTransaction`) and every 15 min (heartbeat) it finds the newest BUY/SELL deal with entry IN/INOUT, converts server time → UTC (`TimeTradeServer()-TimeGMT()` rounded to 15 min) and POSTs `{"login","server","last_open_utc","deal","ea"}` to `/api/mt5/sync/` with the key in `Authorization: Bearer` **and** `X-FAIR-Key` (some Apache/cPanel setups drop Authorization). Prints clear errors to the Experts tab (4014 or 4006 = add the site under "Allow WebRequest"). One terminal per account.
 - **Server (`trades/api.py`, `mt5_sync`):** key → `User.mt5_sync_key`; login → that user's accounts with `account_number == login`; always sets `TradingAccount.mt5_last_seen`; moves `last_trade_date` **forward only** with a conditional UPDATE (an old/replayed report can't undo a newer trade recorded elsewhere), caps future times at now, clears snooze. 401 bad key, 400 bad body, 404 unknown login, 429 over 60/min per user.
 - **UI:** profile "MT5 auto-sync" card (setup steps, FundedNext warning, **Download FAIR Sync EA** = `accounts:mt5_ea`, pre-filled with the site URL + user's key; "Show sync key"; "New key"). Dashboard/detail show "🔄 MT5 sync · checked in … ago" or "🔌 quiet since …" (`TradingAccount.mt5_sync_quiet`, > `MT5_QUIET_HOURS`=24h); `/status` lines end "· MT5 ✓" / "· MT5 quiet"; the daily admin report lists quiet accounts (`trades.reporting.quiet_mt5_accounts`). No Telegram message per sync (silent by choice).
-- **Verified:** 248 tests pass; curl against a scratch-DB dev server: newer open → updated, older open/heartbeat → unchanged, wrong login → 404, bad key → 401. **Live demo run (2026-11-23):** MT5 build 6230 under Wine 11 on Linux, Dukascopy demo account, local FAIR at `http://127.0.0.1:8000`. The EA compiles in MetaEditor (0 errors, 0 warnings); three manual trades each reached FAIR within ~2 s and restarted the countdown; server time → UTC came out right (Dukascopy's server is GMT+2).
+- **Verified:** 249 tests pass; curl against a scratch-DB dev server: newer open → updated, older open/heartbeat → unchanged, wrong login → 404, bad key → 401. **Live demo run (2026-11-23):** MT5 build 6230 under Wine 11 on Linux, Dukascopy demo account, local FAIR at `http://127.0.0.1:8000`. The EA compiles in MetaEditor (0 errors, 0 warnings); three manual trades each reached FAIR within ~2 s and restarted the countdown; server time → UTC came out right (Dukascopy's server is GMT+2).
 - **Setup gotchas (from that run):** add the FAIR URL in MT5's Tools › Options › Expert Advisors dialog. Editing `WebRequestUrl` in `Config/common.ini` only ticks the box and leaves the list empty. An unlisted IP-address URL fails with 4006, not 4014; the EA gives the allow-list hint for both. A command-line compile doesn't reload an EA already on a chart, so re-attach it. Under Wine, compile with a path relative to the MT5 folder: `wine MetaEditor64.exe '/compile:MQL5\Experts\FAIR_Sync.mq5' /log`.
 - **Deploy:** `git pull && python manage.py migrate` (accounts 0008, trades 0010) `&& touch tmp/restart.txt`. Then on Windows (or Linux with Wine): profile → Download FAIR Sync EA → MetaEditor F7 → attach to a **demo** account first, open a trade, check FAIR's last trade time; then switch to the investor login on the real account. Set each account's *Account number* on FAIR to its MT5 login.
 
@@ -216,14 +228,14 @@ send_reminders command then: maybe_send_daily_report(), ping_healthcheck()
 - Legal pages (terms, privacy, contact)
 - Production security (HTTPS, cookies, HSTS, headers)
 - Admin interface
-- Test suite (248 passing, incl. MT5 auto-sync)
+- Test suite (249 passing, incl. MT5 auto-sync)
 - Roadmap phases 1–5 (monitoring, one-tap traded, per-account limits, reliable delivery, UX)
 
 ### Known Limitations (Not Next Features, Just Context)
 - **WhatsApp:** Currently hidden in UI (Twilio wired but needs phone validation)
 - **Celery/Redis:** Optional; cron works fine without it
 - **Deadline-day reminder (0 days left):** days are compared by local calendar day, so it fires even if the exact deadline passed earlier that day
-- **MT5 auto-sync:** needs an MT5 terminal you keep running (PC/VPS) with the FAIR Sync EA; without it, last trade date is entered manually (or via one-tap "I traded" / the Telegram picker). MT4 not supported.
+- **MT5 auto-sync:** needs an MT5 terminal you keep running on your own computer (not a VPS) with the FAIR Sync EA, and the firm's rules must allow it; without it, last trade date is entered manually (or via one-tap "I traded" / the Telegram picker). MT4 not supported.
 
 ### **Next Feature to Build: Account Reset / Payout Flow**
 The app currently monitors inactivity but lacks a "reset" workflow. After a user successfully completes a trading cycle (e.g., 30-day profit target), they should:
