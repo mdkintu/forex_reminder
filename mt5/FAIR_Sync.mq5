@@ -174,8 +174,8 @@ void Report(bool force)
    if(status == -1)
      {
       int err = GetLastError();
-      if(err == 4014)
-         Print("FAIR: MT5 blocked the request. Go to Tools > Options > Expert Advisors, tick ",
+      if(err == 4014 || err == 4006)     // 4006: what MT5 returns for an unlisted IP-address URL
+         Print("FAIR: MT5 blocked the request (error ", err, "). Go to Tools > Options > Expert Advisors, tick ",
                "\"Allow WebRequest for listed URL\" and add ", SiteRoot(FairUrl));
       else
          Print("FAIR: could not reach FAIR (error ", err, "). Retrying in a minute.");

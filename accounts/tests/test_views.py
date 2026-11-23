@@ -242,3 +242,16 @@ def test_mt5_ea_download_requires_login(client):
     response = client.get(reverse("accounts:mt5_ea"))
     assert response.status_code == 302
     assert "/login" in response["Location"]
+
+
+def test_mt5_ea_gives_allow_webrequest_hint_for_4006_and_4014():
+    """MT5 refuses a URL missing from "Allow WebRequest" with 4014, or 4006
+    when the URL is an IP address (seen on MT5 build 6230 under Wine). Both
+    must print the fix, not a generic "could not reach FAIR"."""
+    from accounts.views import MT5_EA_PATH
+
+    source = MT5_EA_PATH.read_text(encoding="utf-8")
+    hint = source.index("Allow WebRequest for listed URL")
+    condition = source[source.rfind("if(", 0, hint):hint]
+    assert "4014" in condition
+    assert "4006" in condition
