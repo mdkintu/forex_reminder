@@ -1,6 +1,6 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-24 | **Git SHA:** `ea3c122` (server still at `46b41af`: `/health/` is pushed to `main` but not yet pulled on the server)
+**Last updated:** 2026-11-24 | **Git SHA:** `ea3c122` (on the server since 2026-11-24)
 
 ---
 
@@ -11,7 +11,8 @@
 - **2026-11-23 deploy incident:** `migrate` ran in that wrong virtualenv and failed, but the app was restarted anyway, so the new code ran without the new columns: the sync endpoint returned 500 (logged-in pages most likely too) and all eight hourly runs from 13:00 to 20:00 UTC crashed (`Unknown column 'trades_tradingaccount.mt5_last_seen'`). Fixed by 20:18 UTC by migrating with FAIR's python. No reminders were lost: the dry run afterwards showed no account due and no catch-up pending (next reminders 28–30 Nov).
 - **Root cause of the Oct/Nov outage** (fixed in `2530a77`): dedup ignored the trade cycle, so each account got each reminder day once per lifetime; nothing was sent after 2026-10-06. Fixed with `ReminderHistory.cycle_start` (trades 0005).
 - **Live schedule:** `20 15 10 5 3 2 1 0` days left (note: drops the default's "4 left"; restore with `python manage.py set_reminder_days 20 15 10 5 4 3 2 1 0` if wanted).
-- **Cron:** hourly `cd /home/tergfern/fair && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py send_reminders >> reminders.log 2>&1` (unchanged). Dry run on 2026-11-18 showed accounts #4/#5 due a day-15 catch-up at 14:00 EAT.
+- **Monitoring:** two healthchecks.io checks, both alerting on Telegram through @HealthchecksBot. "FAIR reminders" is pinged by the hourly job (`HEALTHCHECK_PING_URL`). "FAIR website" is pinged by a 5-minute server cron that loads `/health/` (see "Website health check"). Keep the ping URLs out of git.
+- **Cron:** hourly `cd /home/tergfern/fair && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py send_reminders >> reminders.log 2>&1`, plus the 5-minute website check. The crontab is shared with ngw and Phamily SACCO and runs on Kampala time (`CRON_TZ=Africa/Kampala`). To change it, back it up, edit a copy, check the copy, then install it with `crontab <file>`. Never pipe into `crontab -`: on 2026-11-24 a failed `crontab -l | sed … | crontab -` installed an empty crontab and wiped every job for a few minutes (restored from `~/crontab.backup` by 21:29 EAT). Dry run on 2026-11-18 showed accounts #4/#5 due a day-15 catch-up at 14:00 EAT.
 - **Daily admin report:** `admin@fair.tergym.com` is the only superuser and has no Telegram connected, and the owner wants to keep it that way. So the report needs `ADMIN_TELEGRAM_CHAT_ID=<owner's existing chat id>` in the server `.env` (otherwise it falls back to emailing admin@fair.tergym.com). Check: `python manage.py shell -c "from trades.reporting import report_recipients; print(report_recipients())"`.
 
 ### Still to verify on the server (updated 2026-11-24)
@@ -20,7 +21,7 @@
 - [ ] Email delivery: history so far shows only Telegram rows; use **Send me a test reminder** on the profile page.
 - [ ] Tidy: remove the duplicate `EMAIL_BACKEND` line in the server `.env`.
 - [x] `HEALTHCHECK_PING_URL` set 2026-11-24: healthchecks.io check "FAIR reminders" (cron `0 * * * *` UTC, 30 min grace). Alerts go to Telegram through healthchecks.io's own bot (@HealthchecksBot), so FAIR's bot token isn't shared. A run that crashes pings `/fail` and alerts at once; a run that never starts (dead cron, server down, broken python) alerts after the grace time. Tested from the server: success, `/fail` and success pings all accepted, and the Telegram down and up alerts arrived.
-- [ ] Website monitor: deploy `ea3c122`, check that `curl -s https://fair.tergym.com/health/` prints `ok`, then add the 5-minute cron and the healthchecks.io check "FAIR website" (see "Website health check" below).
+- [x] Website monitor set up 2026-11-24: `ea3c122` deployed, `/health/` returns `ok` (200, not cached) from the server and from outside, the 5-minute cron is in, and its first ping to the healthchecks.io check "FAIR website" was accepted. The Telegram alert test (`/1` then `/0`) hasn't been run for this check yet.
 
 ### Prop-firm inactivity limits (for each account's "Inactivity days")
 | Firm / account | Limit |
@@ -104,9 +105,9 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - **Setup gotchas (from that run):** add the FAIR URL in MT5's Tools › Options › Expert Advisors dialog. Editing `WebRequestUrl` in `Config/common.ini` only ticks the box and leaves the list empty. An unlisted IP-address URL fails with 4006, not 4014; the EA gives the allow-list hint for both. A command-line compile doesn't reload an EA already on a chart, so re-attach it. Under Wine, compile with a path relative to the MT5 folder: `wine MetaEditor64.exe '/compile:MQL5\Experts\FAIR_Sync.mq5' /log`.
 - **Deploy (done 2026-11-23):** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate` (accounts 0008, trades 0010) `&& touch tmp/restart.txt`. Then on Windows (or Linux with Wine): profile → Download FAIR Sync EA → MetaEditor F7 → attach to a **demo** account first, open a trade, check FAIR's last trade time; then switch to the investor login on the real account. Set each account's *Account number* on FAIR to its MT5 login.
 
-### Website health check (2026-11-24, `ea3c122`; not yet deployed)
+### Website health check (`ea3c122`, deployed 2026-11-24)
 - **`/health/`** (`forex_reminder/health.py`): `ok` (200) when the database answers and every migration is applied; `N unapplied migration(s)` (503) when the code is ahead of the database, as in the 2026-11-23 incident (the home page didn't show that one: it doesn't touch the database); 500 if the database is unreachable. Never cached.
-- **Monitor (set up after the deploy):** a server cron loads it every 5 min (30 s timeout, 2 retries) and pings the healthchecks.io check "FAIR website" with curl's exit status, so alerts come from @HealthchecksBot like the reminder check's. Catches pending migrations, a database that's down, an app that can't start, web server or SSL problems, answers slower than 30 s, and the server going silent. Blind spots: bugs limited to one page, and problems only outside visitors hit (DNS, domain expiry).
+- **Monitor (set up 2026-11-24):** a server cron (`*/5 * * * *`) loads it (30 s timeout, 2 retries) and pings the healthchecks.io check "FAIR website" (Simple: 5 min period, 10 min grace) with curl's exit status (`https://hc-ping.com/<uuid>/$?`), so alerts come from @HealthchecksBot like the reminder check's. Catches pending migrations, a database that's down, an app that can't start, web server or SSL problems, answers slower than 30 s, and the server going silent. Blind spots: bugs limited to one page, and problems only outside visitors hit (DNS, domain expiry).
 - **Deploy:** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate && touch tmp/restart.txt` (no new migration), then `curl -s https://fair.tergym.com/health/` should print `ok`.
 
 ### Deploy everything at once (phases 1–5)
@@ -279,7 +280,7 @@ The app currently monitors inactivity but lacks a "reset" workflow. After a user
 | `trades/api.py` + `mt5/FAIR_Sync.mq5` | MT5 auto-sync endpoint + the Expert Advisor | ✅ Deployed 2026-11-23; EA compiled and run on a demo account (MT5 under Wine) |
 | `trades/views.py` | Account CRUD, reminder history view | ✅ Complete |
 | `forex_reminder/settings.py` | Django config, security, Celery | ✅ Complete |
-| `forex_reminder/health.py` | `/health/` page for the uptime monitor | ✅ Built 2026-11-24; deploy pending |
+| `forex_reminder/health.py` | `/health/` page for the uptime monitor | ✅ Deployed 2026-11-24 |
 | `conftest.py` + test files | pytest fixtures, auth/CRUD/task tests | ✅ Complete |
 
 ---
