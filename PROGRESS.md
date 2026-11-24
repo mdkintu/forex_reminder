@@ -14,12 +14,12 @@
 - **Cron:** hourly `cd /home/tergfern/fair && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py send_reminders >> reminders.log 2>&1` (unchanged). Dry run on 2026-11-18 showed accounts #4/#5 due a day-15 catch-up at 14:00 EAT.
 - **Daily admin report:** `admin@fair.tergym.com` is the only superuser and has no Telegram connected, and the owner wants to keep it that way. So the report needs `ADMIN_TELEGRAM_CHAT_ID=<owner's existing chat id>` in the server `.env` (otherwise it falls back to emailing admin@fair.tergym.com). Check: `python manage.py shell -c "from trades.reporting import report_recipients; print(report_recipients())"`.
 
-### Still to verify on the server (no results reported yet as of 2026-11-20)
+### Still to verify on the server (updated 2026-11-24)
 - [ ] `ADMIN_TELEGRAM_CHAT_ID` added to `.env` and the first daily report arrives (after 06:00 UTC / 09:00 EAT).
 - [ ] `reminders.log` shows the catch-up sends for accounts #4/#5.
 - [ ] Email delivery: history so far shows only Telegram rows; use **Send me a test reminder** on the profile page.
 - [ ] Tidy: remove the duplicate `EMAIL_BACKEND` line in the server `.env`.
-- [ ] Optional: `HEALTHCHECK_PING_URL` (e.g. healthchecks.io) to catch a dead cron.
+- [x] `HEALTHCHECK_PING_URL` set 2026-11-24: healthchecks.io check "FAIR reminders" (cron `0 * * * *` UTC, 30 min grace). Alerts go to Telegram through healthchecks.io's own bot (@HealthchecksBot), so FAIR's bot token isn't shared. A run that crashes pings `/fail` and alerts at once; a run that never starts (dead cron, server down, broken python) alerts after the grace time. Tested from the server: success, `/fail` and success pings all accepted, and the Telegram down and up alerts arrived.
 
 ### Prop-firm inactivity limits (for each account's "Inactivity days")
 | Firm / account | Limit |
