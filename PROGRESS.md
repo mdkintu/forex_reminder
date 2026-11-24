@@ -1,6 +1,6 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-24 | **Git SHA:** `46b41af` (on the server since 2026-11-23)
+**Last updated:** 2026-11-24 | **Git SHA:** `ea3c122` (server still at `46b41af`: `/health/` is pushed to `main` but not yet pulled on the server)
 
 ---
 
@@ -20,6 +20,7 @@
 - [ ] Email delivery: history so far shows only Telegram rows; use **Send me a test reminder** on the profile page.
 - [ ] Tidy: remove the duplicate `EMAIL_BACKEND` line in the server `.env`.
 - [x] `HEALTHCHECK_PING_URL` set 2026-11-24: healthchecks.io check "FAIR reminders" (cron `0 * * * *` UTC, 30 min grace). Alerts go to Telegram through healthchecks.io's own bot (@HealthchecksBot), so FAIR's bot token isn't shared. A run that crashes pings `/fail` and alerts at once; a run that never starts (dead cron, server down, broken python) alerts after the grace time. Tested from the server: success, `/fail` and success pings all accepted, and the Telegram down and up alerts arrived.
+- [ ] Website monitor: deploy `ea3c122`, check that `curl -s https://fair.tergym.com/health/` prints `ok`, then add the 5-minute cron and the healthchecks.io check "FAIR website" (see "Website health check" below).
 
 ### Prop-firm inactivity limits (for each account's "Inactivity days")
 | Firm / account | Limit |
@@ -102,6 +103,11 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - **Verified:** 249 tests pass; curl against a scratch-DB dev server: newer open → updated, older open/heartbeat → unchanged, wrong login → 404, bad key → 401. **Live demo run (2026-11-23):** MT5 build 6230 under Wine 11 on Linux, Dukascopy demo account, local FAIR at `http://127.0.0.1:8000`. The EA compiles in MetaEditor (0 errors, 0 warnings); three manual trades each reached FAIR within ~2 s and restarted the countdown; server time → UTC came out right (Dukascopy's server is GMT+2).
 - **Setup gotchas (from that run):** add the FAIR URL in MT5's Tools › Options › Expert Advisors dialog. Editing `WebRequestUrl` in `Config/common.ini` only ticks the box and leaves the list empty. An unlisted IP-address URL fails with 4006, not 4014; the EA gives the allow-list hint for both. A command-line compile doesn't reload an EA already on a chart, so re-attach it. Under Wine, compile with a path relative to the MT5 folder: `wine MetaEditor64.exe '/compile:MQL5\Experts\FAIR_Sync.mq5' /log`.
 - **Deploy (done 2026-11-23):** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate` (accounts 0008, trades 0010) `&& touch tmp/restart.txt`. Then on Windows (or Linux with Wine): profile → Download FAIR Sync EA → MetaEditor F7 → attach to a **demo** account first, open a trade, check FAIR's last trade time; then switch to the investor login on the real account. Set each account's *Account number* on FAIR to its MT5 login.
+
+### Website health check (2026-11-24, `ea3c122`; not yet deployed)
+- **`/health/`** (`forex_reminder/health.py`): `ok` (200) when the database answers and every migration is applied; `N unapplied migration(s)` (503) when the code is ahead of the database, as in the 2026-11-23 incident (the home page didn't show that one: it doesn't touch the database); 500 if the database is unreachable. Never cached.
+- **Monitor (set up after the deploy):** a server cron loads it every 5 min (30 s timeout, 2 retries) and pings the healthchecks.io check "FAIR website" with curl's exit status, so alerts come from @HealthchecksBot like the reminder check's. Catches pending migrations, a database that's down, an app that can't start, web server or SSL problems, answers slower than 30 s, and the server going silent. Blind spots: bugs limited to one page, and problems only outside visitors hit (DNS, domain expiry).
+- **Deploy:** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate && touch tmp/restart.txt` (no new migration), then `curl -s https://fair.tergym.com/health/` should print `ok`.
 
 ### Deploy everything at once (phases 1–5)
 In `/home/tergfern/fair`, with `python` meaning `/home/tergfern/virtualenv/fair/3.12/bin/python` (see "Server python" above): `git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, optionally add `HEALTHCHECK_PING_URL` to `.env`, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
@@ -230,7 +236,7 @@ send_reminders command then: maybe_send_daily_report(), ping_healthcheck()
 - Legal pages (terms, privacy, contact)
 - Production security (HTTPS, cookies, HSTS, headers)
 - Admin interface
-- Test suite (249 passing, incl. MT5 auto-sync)
+- Test suite (251 passing, incl. MT5 auto-sync and `/health/`)
 - Roadmap phases 1–5 (monitoring, one-tap traded, per-account limits, reliable delivery, UX)
 
 ### Known Limitations (Not Next Features, Just Context)
@@ -273,6 +279,7 @@ The app currently monitors inactivity but lacks a "reset" workflow. After a user
 | `trades/api.py` + `mt5/FAIR_Sync.mq5` | MT5 auto-sync endpoint + the Expert Advisor | ✅ Deployed 2026-11-23; EA compiled and run on a demo account (MT5 under Wine) |
 | `trades/views.py` | Account CRUD, reminder history view | ✅ Complete |
 | `forex_reminder/settings.py` | Django config, security, Celery | ✅ Complete |
+| `forex_reminder/health.py` | `/health/` page for the uptime monitor | ✅ Built 2026-11-24; deploy pending |
 | `conftest.py` + test files | pytest fixtures, auth/CRUD/task tests | ✅ Complete |
 
 ---
@@ -331,7 +338,7 @@ python manage.py set_telegram_webhook
 
 ## Next-Session Entry Point
 
-1. **Check git log:** `git log --oneline -5` (last work on 2026-11-19); then the "Still to verify on the server" list above
+1. **Check git log:** `git log --oneline -5` (last work on 2026-11-24); then the "Still to verify on the server" list above
 2. **Review feature request:** If expanding reminder rules or adding reset/payout, read "Next Feature" above
 3. **Run tests:** `pytest -v` (ensure everything still passes)
 4. **Start dev server:** `python manage.py runserver`
