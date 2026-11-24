@@ -111,20 +111,24 @@
             <ol class="text-secondary small ps-3 mb-2">
                 <li>On the computer you trade from (or another one on the same home network), open a
                     <strong>separate</strong> MT5 and log in with the account's <strong>investor (read-only)
-                    password</strong>. One MT5 per account. Use your own computer, not a VPS: some firms
-                    ban or flag VPS logins. On Linux or Mac, MT5 runs under Wine.</li>
+                    password</strong>. One MT5 per account. If the account is already traded by an EA your
+                    firm allows (for example, your own bot), you can use the MT5 that runs it instead. Use your
+                    own computer, not a VPS: some firms ban or flag VPS logins. On Linux or Mac, MT5 runs under
+                    Wine.</li>
                 <li>In that MT5: Tools › Options › Expert Advisors, tick “Allow WebRequest for listed URL”
-                    and add <code>{{ site_url }}</code>. Leave Algo Trading off.</li>
+                    and add <code>{{ site_url }}</code>. Change nothing else: in a separate MT5, Algo Trading
+                    stays off; in one that runs your bot, leave it on.</li>
                 <li>Download the EA below, open it in MetaEditor, compile (F7), then drag
-                    <em>FAIR_Sync</em> onto any chart.</li>
+                    <em>FAIR_Sync</em> onto a chart with no other EA (dropping it on your bot's chart would
+                    replace the bot). Untick its own “Allow Algo Trading”: it never trades.</li>
                 <li>Make sure each account's <em>Account number</em> on FAIR is its MT5 login.</li>
             </ol>
             <p class="small text-warning-emphasis mb-2">
                 Check your firm's rules first. FundedNext CFD accounts of $50k and above ban EAs and
                 “any automated tools”: ask FundedNext in writing before using FAIR Sync there, and use
                 “I traded” until they say yes. Goat Funded Trader allows only EAs you wrote yourself and
-                bans VPNs and VPSs, so run it only on your own computer. Never attach FAIR Sync to the
-                MT5 you trade in.
+                bans VPNs and VPSs, so run it only on your own computer. Where a firm restricts EAs, keep
+                FAIR Sync out of the MT5 you trade in and use the separate investor-password MT5.
             </p>
             <a class="btn btn-outline-primary btn-sm mb-2" href="{% url 'accounts:mt5_ea' %}">Download FAIR Sync EA</a>
             <details class="small mb-2">

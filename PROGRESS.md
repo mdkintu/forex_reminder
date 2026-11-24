@@ -104,6 +104,7 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - **Verified:** 249 tests pass; curl against a scratch-DB dev server: newer open → updated, older open/heartbeat → unchanged, wrong login → 404, bad key → 401. **Live demo run (2026-11-23):** MT5 build 6230 under Wine 11 on Linux, Dukascopy demo account, local FAIR at `http://127.0.0.1:8000`. The EA compiles in MetaEditor (0 errors, 0 warnings); three manual trades each reached FAIR within ~2 s and restarted the countdown; server time → UTC came out right (Dukascopy's server is GMT+2).
 - **Setup gotchas (from that run):** add the FAIR URL in MT5's Tools › Options › Expert Advisors dialog. Editing `WebRequestUrl` in `Config/common.ini` only ticks the box and leaves the list empty. An unlisted IP-address URL fails with 4006, not 4014; the EA gives the allow-list hint for both. A command-line compile doesn't reload an EA already on a chart, so re-attach it. Under Wine, compile with a path relative to the MT5 folder: `wine MetaEditor64.exe '/compile:MQL5\Experts\FAIR_Sync.mq5' /log`.
 - **Deploy (done 2026-11-23):** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate` (accounts 0008, trades 0010) `&& touch tmp/restart.txt`. Then on Windows (or Linux with Wine): profile → Download FAIR Sync EA → MetaEditor F7 → attach to a **demo** account first, open a trade, check FAIR's last trade time; then switch to the investor login on the real account. Set each account's *Account number* on FAIR to its MT5 login.
+- **In use since 2026-11-24:** the GFT "$10K Phase 2" account (login 315004527, GoatFunded-Server) syncs from the owner's GFT trading terminal on their own computer (MT5 under Wine). FAIR Sync sits on its own chart there, next to the owner's own trading EA. A separate investor-password terminal isn't needed for this account: it's already traded by a self-written EA, which GFT allows. The first sync moved the last trade forward to 2026-11-19 14:30 UTC (25 days left). Accounts at firms that ban EAs still need the separate investor terminal. The profile card and the EA header now describe both options: a chart with no other EA, its own "Allow Algo Trading" unticked, and the terminal's Algo Trading left on for the bot.
 
 ### Website health check (`ea3c122`, deployed 2026-11-24)
 - **`/health/`** (`forex_reminder/health.py`): `ok` (200) when the database answers and every migration is applied; `N unapplied migration(s)` (503) when the code is ahead of the database, as in the 2026-11-23 incident (the home page didn't show that one: it doesn't touch the database); 500 if the database is unreachable. Never cached.
@@ -237,7 +238,7 @@ send_reminders command then: maybe_send_daily_report(), ping_healthcheck()
 - Legal pages (terms, privacy, contact)
 - Production security (HTTPS, cookies, HSTS, headers)
 - Admin interface
-- Test suite (251 passing, incl. MT5 auto-sync and `/health/`)
+- Test suite (253 passing, incl. MT5 auto-sync and `/health/`)
 - Roadmap phases 1–5 (monitoring, one-tap traded, per-account limits, reliable delivery, UX)
 
 ### Known Limitations (Not Next Features, Just Context)

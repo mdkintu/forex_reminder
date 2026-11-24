@@ -229,6 +229,21 @@ def test_profile_mt5_card_says_no_vps_and_flags_firm_rules(authenticated_client)
 
 
 @pytest.mark.django_db
+def test_profile_mt5_card_allows_the_trading_mt5_when_an_allowed_ea_trades(authenticated_client):
+    """An account already traded by an EA the firm allows (e.g. the owner's own
+    bot on GFT) can run FAIR Sync in that same MT5, on a chart with no other EA:
+    dropping it on the bot's chart would replace the bot. Firms that restrict
+    EAs still get the separate investor-password MT5."""
+    html = authenticated_client.get(reverse("accounts:profile")).content.decode()
+    # Collapse whitespace: the template wraps sentences across lines.
+    card = " ".join(html[html.index('id="mt5"'):html.index(reverse("accounts:mt5_ea"))].split())
+    assert "Never attach FAIR Sync to the MT5 you trade in" not in card
+    assert "already traded by an EA your firm allows" in card
+    assert "a chart with no other EA" in card
+    assert "investor-password MT5" in card
+
+
+@pytest.mark.django_db
 def test_regenerate_mt5_key(authenticated_client, user):
     old = user.get_or_create_mt5_sync_key()
     response = authenticated_client.post(reverse("accounts:profile"), {"regenerate_mt5_key": "1"})
@@ -268,3 +283,16 @@ def test_mt5_ea_gives_allow_webrequest_hint_for_4006_and_4014():
     condition = source[source.rfind("if(", 0, hint):hint]
     assert "4014" in condition
     assert "4006" in condition
+
+
+def test_mt5_ea_header_keeps_a_bots_algo_trading_on():
+    """Someone running FAIR Sync next to their own trading bot must not be told
+    to switch the terminal's Algo Trading off: that would stop the bot."""
+    from accounts.views import MT5_EA_PATH
+
+    lines = MT5_EA_PATH.read_text(encoding="utf-8").splitlines()
+    # The header is a box of "//| ... |" lines; join its text into one string.
+    header = " ".join(" ".join(l[3:].rstrip().rstrip("|").split()) for l in lines if l.startswith("//|"))
+    assert "already traded by an EA your firm allows" in header
+    assert "a chart with no other EA" in header
+    assert "leave the terminal's on" in header

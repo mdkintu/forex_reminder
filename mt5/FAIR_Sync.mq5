@@ -5,8 +5,11 @@
 //| by itself.                                                       |
 //|                                                                  |
 //| READ-ONLY: it never opens, closes or modifies orders or trades.  |
-//| Leave "Algo Trading" OFF, and run it in a terminal logged in     |
-//| with the account's INVESTOR (read-only) password.                |
+//| Run it in a separate terminal logged in with the account's       |
+//| INVESTOR (read-only) password, with "Algo Trading" OFF. If the   |
+//| account is already traded by an EA your firm allows, you can run |
+//| it in that terminal instead: on a chart with no other EA, with   |
+//| its own "Allow Algo Trading" unticked (leave the terminal's on). |
 //| Run it on your own computer (the one you trade from, or another  |
 //| on the same network), NOT a VPS: some prop firms ban or flag VPS |
 //| logins. Check your firm's EA rules first: FundedNext CFD $50k+   |
