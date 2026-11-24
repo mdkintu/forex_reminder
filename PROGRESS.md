@@ -1,15 +1,17 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-23 | **Git SHA:** `5f2654b` (server still at `61ca270`: the Telegram date & time picker is pushed to `main` but not yet pulled on the server)
+**Last updated:** 2026-11-24 | **Git SHA:** `46b41af` (on the server since 2026-11-23)
 
 ---
 
-## Live status (2026-11-19)
+## Live status (2026-11-24)
 
-- **Deployed** to `/home/tergfern/fair` at `61ca270`: all migrations applied on MariaDB (accounts 0006–0007, trades 0005–0009), `set_telegram_webhook` done (callbacks + command menu), app restarted.
+- **Deployed** to `/home/tergfern/fair` at `46b41af` on 2026-11-23: MT5 auto-sync + the Telegram date & time picker. All migrations applied on MariaDB (accounts 0006–0008, trades 0005–0010), `set_telegram_webhook` done (callbacks + command menu), app restarted. Check after it: the sync endpoint returns 401 for a fake key, home and login pages 200.
+- **Server python:** run `manage.py` as `/home/tergfern/virtualenv/fair/3.12/bin/python` (the one the cron uses), never bare `python`. The SSH shell can start inside another app's virtualenv (phamily-sacco, prompt `(backend:3.11)`), where `migrate` fails with `No module named 'celery'`. Run `migrate` and see it succeed **before** `touch tmp/restart.txt`.
+- **2026-11-23 deploy incident:** `migrate` ran in that wrong virtualenv and failed, but the app was restarted anyway, so the new code ran without the new columns: the sync endpoint returned 500 (logged-in pages most likely too) and all eight hourly runs from 13:00 to 20:00 UTC crashed (`Unknown column 'trades_tradingaccount.mt5_last_seen'`). Fixed by 20:18 UTC by migrating with FAIR's python. No reminders were lost: the dry run afterwards showed no account due and no catch-up pending (next reminders 28–30 Nov).
 - **Root cause of the Oct/Nov outage** (fixed in `2530a77`): dedup ignored the trade cycle, so each account got each reminder day once per lifetime; nothing was sent after 2026-10-06. Fixed with `ReminderHistory.cycle_start` (trades 0005).
 - **Live schedule:** `20 15 10 5 3 2 1 0` days left (note: drops the default's "4 left"; restore with `python manage.py set_reminder_days 20 15 10 5 4 3 2 1 0` if wanted).
-- **Cron:** hourly `send_reminders >> reminders.log` (unchanged). Dry run on 2026-11-18 showed accounts #4/#5 due a day-15 catch-up at 14:00 EAT.
+- **Cron:** hourly `cd /home/tergfern/fair && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py send_reminders >> reminders.log 2>&1` (unchanged). Dry run on 2026-11-18 showed accounts #4/#5 due a day-15 catch-up at 14:00 EAT.
 - **Daily admin report:** `admin@fair.tergym.com` is the only superuser and has no Telegram connected, and the owner wants to keep it that way. So the report needs `ADMIN_TELEGRAM_CHAT_ID=<owner's existing chat id>` in the server `.env` (otherwise it falls back to emailing admin@fair.tergym.com). Check: `python manage.py shell -c "from trades.reporting import report_recipients; print(report_recipients())"`.
 
 ### Still to verify on the server (no results reported yet as of 2026-11-20)
@@ -86,12 +88,12 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - Per-user send hours: `User.reminder_hours` (≤3, profile checkboxes 06–22) via `User.get_reminder_hours()` in the task, next-reminder time and labels.
 - **Deploy:** `git pull`, `migrate` (accounts 0007, trades 0009), restart.
 
-### Telegram: pick the date & time of a trade ✅ (2026-11-22, pushed to main as `5f2654b`; server pull + restart pending)
+### Telegram: pick the date & time of a trade ✅ (2026-11-22, `5f2654b`; deployed 2026-11-23 with `46b41af`)
 - `/traded` with one account now asks **[✅ Just now] [🕒 Pick date & time]** instead of recording at once; the multi-account list has both per account; reminders get a third button "🕒 Traded earlier…".
 - Picker (`accounts/telegram_bot.py`): last 7 days → hour → minutes (5-min steps), in the user's timezone, future times hidden and rejected server-side. Stateless callbacks: `pick:<pk>[:<YYYYMMDD>[:<HH>]]`, `at:<pk>:<YYYYMMDD>:<HHMM>`, `menu:<pk>` (back), `noop` (header labels). Swaps only the buttons (`trades.notifications.edit_message_buttons`), so reminder text is kept; the final tap appends the confirmation like "I traded" does. Older dates: use the website.
 - **Deploy:** `git pull` + restart only (no migration; `callback_query` is already registered, so no `set_telegram_webhook` re-run).
 
-### MT5 auto-sync ✅ (2026-11-22, committed 2026-11-23 on branch `mt5-auto-sync`; not yet merged to main or deployed)
+### MT5 auto-sync ✅ (2026-11-22; deployed 2026-11-23 at `46b41af`)
 - **What:** the FAIR Sync Expert Advisor (`mt5/FAIR_Sync.mq5`) reports each account's newest trade **open** time; FAIR restarts the countdown from it. Closes are ignored on purpose: firms reset inactivity when a trade is *placed*, so counting from a close could show more days left than the firm gives.
 - **Why an EA in an investor-password terminal:** MT5 has no public web API and cPanel can't run MT5, so data has to come from a terminal the user runs on their own computer (Windows, or Linux/Mac with Wine), not a VPS (see "Firm rules that affect the FAIR Sync EA"). **FundedNext CFD ≥ $50k bans EAs/"any automated tools"** (help article 8020763), so the EA runs in a *separate* MT5 logged in with the **investor (read-only) password**, Algo Trading off; it has no trade calls. Cloud services (MetaApi) avoided: shared IPs can trip FundedNext's group-trading/IP checks. Trades placed from phone/other PCs are still seen (history comes from the broker's server).
 - **EA:** on start, on every new deal (`OnTradeTransaction`) and every 15 min (heartbeat) it finds the newest BUY/SELL deal with entry IN/INOUT, converts server time → UTC (`TimeTradeServer()-TimeGMT()` rounded to 15 min) and POSTs `{"login","server","last_open_utc","deal","ea"}` to `/api/mt5/sync/` with the key in `Authorization: Bearer` **and** `X-FAIR-Key` (some Apache/cPanel setups drop Authorization). Prints clear errors to the Experts tab (4014 or 4006 = add the site under "Allow WebRequest"). One terminal per account.
@@ -99,10 +101,10 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - **UI:** profile "MT5 auto-sync" card (setup steps, FundedNext warning, **Download FAIR Sync EA** = `accounts:mt5_ea`, pre-filled with the site URL + user's key; "Show sync key"; "New key"). Dashboard/detail show "🔄 MT5 sync · checked in … ago" or "🔌 quiet since …" (`TradingAccount.mt5_sync_quiet`, > `MT5_QUIET_HOURS`=24h); `/status` lines end "· MT5 ✓" / "· MT5 quiet"; the daily admin report lists quiet accounts (`trades.reporting.quiet_mt5_accounts`). No Telegram message per sync (silent by choice).
 - **Verified:** 249 tests pass; curl against a scratch-DB dev server: newer open → updated, older open/heartbeat → unchanged, wrong login → 404, bad key → 401. **Live demo run (2026-11-23):** MT5 build 6230 under Wine 11 on Linux, Dukascopy demo account, local FAIR at `http://127.0.0.1:8000`. The EA compiles in MetaEditor (0 errors, 0 warnings); three manual trades each reached FAIR within ~2 s and restarted the countdown; server time → UTC came out right (Dukascopy's server is GMT+2).
 - **Setup gotchas (from that run):** add the FAIR URL in MT5's Tools › Options › Expert Advisors dialog. Editing `WebRequestUrl` in `Config/common.ini` only ticks the box and leaves the list empty. An unlisted IP-address URL fails with 4006, not 4014; the EA gives the allow-list hint for both. A command-line compile doesn't reload an EA already on a chart, so re-attach it. Under Wine, compile with a path relative to the MT5 folder: `wine MetaEditor64.exe '/compile:MQL5\Experts\FAIR_Sync.mq5' /log`.
-- **Deploy:** `git pull && python manage.py migrate` (accounts 0008, trades 0010) `&& touch tmp/restart.txt`. Then on Windows (or Linux with Wine): profile → Download FAIR Sync EA → MetaEditor F7 → attach to a **demo** account first, open a trade, check FAIR's last trade time; then switch to the investor login on the real account. Set each account's *Account number* on FAIR to its MT5 login.
+- **Deploy (done 2026-11-23):** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate` (accounts 0008, trades 0010) `&& touch tmp/restart.txt`. Then on Windows (or Linux with Wine): profile → Download FAIR Sync EA → MetaEditor F7 → attach to a **demo** account first, open a trade, check FAIR's last trade time; then switch to the investor login on the real account. Set each account's *Account number* on FAIR to its MT5 login.
 
 ### Deploy everything at once (phases 1–5)
-`git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, optionally add `HEALTHCHECK_PING_URL` to `.env`, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
+In `/home/tergfern/fair`, with `python` meaning `/home/tergfern/virtualenv/fair/3.12/bin/python` (see "Server python" above): `git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, optionally add `HEALTHCHECK_PING_URL` to `.env`, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
 
 ---
 
@@ -268,7 +270,7 @@ The app currently monitors inactivity but lacks a "reset" workflow. After a user
 | `templates/dashboard.html` | Account list with live countdown (JS tickers) | ✅ Complete |
 | `templates/tradingaccount_detail.html` | Account detail + reminder history + edit | ✅ Complete |
 | `accounts/views.py` | Auth, profile, Telegram webhook, MT5 EA download | ✅ Complete |
-| `trades/api.py` + `mt5/FAIR_Sync.mq5` | MT5 auto-sync endpoint + the Expert Advisor | ✅ Built; EA compiled and run on a demo account (MT5 under Wine) |
+| `trades/api.py` + `mt5/FAIR_Sync.mq5` | MT5 auto-sync endpoint + the Expert Advisor | ✅ Deployed 2026-11-23; EA compiled and run on a demo account (MT5 under Wine) |
 | `trades/views.py` | Account CRUD, reminder history view | ✅ Complete |
 | `forex_reminder/settings.py` | Django config, security, Celery | ✅ Complete |
 | `conftest.py` + test files | pytest fixtures, auth/CRUD/task tests | ✅ Complete |
