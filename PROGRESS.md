@@ -1,6 +1,6 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-24 | **Git SHA:** `ea3c122` (on the server since 2026-11-24)
+**Last updated:** 2026-11-24 | **Git SHA:** `5481f94` (on the server since 2026-11-24)
 
 ---
 
@@ -21,7 +21,7 @@
 - [x] Email delivery: SMTP through Brevo (`smtp-relay.brevo.com:587`, TLS). 47 email reminders recorded as sent, none failed, and the profile page's **Send me a test reminder** arrived (2026-11-24).
 - [x] Duplicate `EMAIL_BACKEND` removed on 2026-11-24: the unused console line went, and the SMTP line (the last one, so it was already in effect) stays; `grep -c '^EMAIL_BACKEND' .env` prints 1 (checked). Backup at `.env.backup-2026-11-24`. The site answers 403 for `/.env` and the backup.
 - [x] `HEALTHCHECK_PING_URL` set 2026-11-24: healthchecks.io check "FAIR reminders" (cron `0 * * * *` UTC, 30 min grace). Alerts go to Telegram through healthchecks.io's own bot (@HealthchecksBot), so FAIR's bot token isn't shared. A run that crashes pings `/fail` and alerts at once; a run that never starts (dead cron, server down, broken python) alerts after the grace time. Tested from the server: success, `/fail` and success pings all accepted, and the Telegram down and up alerts arrived.
-- [x] Website monitor set up 2026-11-24: `ea3c122` deployed, `/health/` returns `ok` (200, not cached) from the server and from outside, the 5-minute cron is in, and its first ping to the healthchecks.io check "FAIR website" was accepted. The Telegram alert test (`/1` then `/0`) hasn't been run for this check yet.
+- [x] Website monitor set up 2026-11-24: `ea3c122` deployed, `/health/` returns `ok` (200, not cached) from the server and from outside, the 5-minute cron is in, and its first ping to the healthchecks.io check "FAIR website" was accepted. Telegram alert test the same day: a `/1` then a `/0` ping gave the down and up alerts.
 
 ### Prop-firm inactivity limits (for each account's "Inactivity days")
 | Firm / account | Limit |
