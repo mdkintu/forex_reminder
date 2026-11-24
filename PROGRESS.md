@@ -4,6 +4,34 @@
 
 ---
 
+## Next steps (end of 2026-11-24)
+
+1. **Sync the other four accounts:** "$50k Phase 2" (#5), "$5k Live Account" (#7) and the two "$5k Phase 1" (#6, #8). For each, find the firm (ask the owner, or look it up through the FundedNext connector) and the computer it's traded from. Set its *Account number* on FAIR to its MT5 login, then:
+   - **FundedNext CFD, $50k and up:** send the question below and keep using "I traded" until FundedNext says yes in writing.
+   - **FundedNext under $50k, or The5ers:** a separate MT5 with the investor password, or the trading MT5 if an EA the firm allows already trades there (FAIR Sync on a chart with no other EA).
+2. **Reset/payout feature:** design it first (see "Next Feature to Build").
+
+Already done: GFT "$10K Phase 2" syncs since 2026-11-24 (see "MT5 auto-sync"). Its Goat Funded Trader question (drafted 2026-11-23) is optional now. If it's sent, reword it first: FAIR Sync runs in the trading terminal next to the owner's own bot, not in a separate investor terminal.
+
+**FundedNext question** (drafted 2026-11-23, not sent). Fill in the brackets and check that every statement is true for that account before sending:
+
+> Hi,
+>
+> Before I use something on my FundedNext CFD account [login] ($[size]), I'd like your confirmation in writing.
+>
+> I wrote a small Expert Advisor for my own use that reminds me before the account reaches the 30-day inactivity limit. It:
+> - runs in a separate MT5 terminal logged in with the account's **investor (read-only) password**, on my own computer and home internet connection, the same ones I trade from (no VPS or VPN);
+> - only reads the account's trade history (the time of my latest opened trade) and sends it to my personal reminder app;
+> - never opens, changes or closes orders. It can't, because the investor login has no trading rights, and Algo Trading stays off in that terminal.
+>
+> I place all my trades manually from my usual terminal or phone.
+>
+> As accounts of $50k and above can't use EAs or automated tools, is this read-only setup allowed on my account? If it isn't, I'll keep tracking inactivity manually.
+>
+> Thank you.
+
+---
+
 ## Live status (2026-11-24)
 
 - **Deployed** to `/home/tergfern/fair` at `46b41af` on 2026-11-23: MT5 auto-sync + the Telegram date & time picker. All migrations applied on MariaDB (accounts 0006–0008, trades 0005–0010), `set_telegram_webhook` done (callbacks + command menu), app restarted. Check after it: the sync endpoint returns 401 for a fake key, home and login pages 200.
@@ -41,10 +69,10 @@ FAIR Sync never trades, so no trade is ever tagged as coming from an EA. What a 
 |---|---|---|
 | FundedNext CFD < $50k | EAs/bots allowed; VPN/VPS allowed with conditions | OK |
 | FundedNext CFD ≥ $50k | No EAs, bots or "any automated tools" (even SL/TP/lot-size tools); VPN/VPS article applies only below $50k | Ask in writing first; until then use "I traded" |
-| Goat Funded Trader | Only self-written EAs (may ask for the code); from 2026-10-06 no VPN/VPS/proxy/hosting on any account | OK on own computer only |
+| Goat Funded Trader | Only self-written EAs (may ask for the code); from 2026-10-06 no VPN/VPS/proxy/hosting on any account | OK on own computer only; in use since 2026-11-24 |
 | The5ers | EAs allowed; banned: third-party EAs without source, copy trading (mostly third-party sources) | Likely OK; confirm |
 
-Support questions drafted 2026-11-23 for FundedNext (≥ $50k) and Goat Funded Trader; no answers yet.
+Support questions drafted 2026-11-23 for FundedNext (≥ $50k) and Goat Funded Trader, not sent yet: the FundedNext one is under "Next steps"; the Goat Funded Trader one is optional now that the GFT account syncs alongside the owner's own bot.
 
 ---
 
@@ -289,8 +317,8 @@ The app currently monitors inactivity but lacks a "reset" workflow. After a user
 ## Quick Commands (Dev)
 
 ```bash
-# Activate venv
-source venv/bin/activate
+# Activate venv (local: one level up from the repo)
+source ../forex_venv/bin/activate
 
 # Run tests
 pytest -v
@@ -313,7 +341,9 @@ python manage.py set_telegram_webhook
 
 ---
 
-## Deployment Checklist (For Next Session)
+## Deployment Checklist (for a fresh server)
+
+All done on the live server. For a new one, run `manage.py` with that app's own virtualenv python (see "Server python" above).
 
 - [ ] Set `SECRET_KEY` (prod, 50+ random chars)
 - [ ] Set `DEBUG=False`
@@ -340,7 +370,7 @@ python manage.py set_telegram_webhook
 
 ## Next-Session Entry Point
 
-1. **Check git log:** `git log --oneline -5` (last work on 2026-11-24); then the "Still to verify on the server" list above
+1. **Check git log:** `git log --oneline -5` (last work on 2026-11-24); then "Next steps" at the top
 2. **Review feature request:** If expanding reminder rules or adding reset/payout, read "Next Feature" above
 3. **Run tests:** `pytest -v` (ensure everything still passes)
 4. **Start dev server:** `python manage.py runserver`
