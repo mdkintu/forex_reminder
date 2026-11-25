@@ -1,8 +1,9 @@
 """Tests for TradingAccount CRUD views (create, read, update, delete)."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
+from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -198,3 +199,56 @@ def test_detail_404_for_others_account(authenticated_client, second_user):
     )
     response = authenticated_client.get(_detail_url(theirs.pk))
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Times are read and shown in the user's own timezone, not the server's UTC
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def kampala_user(user):
+    user.timezone = "Africa/Kampala"  # UTC+3 all year
+    user.save(update_fields=["timezone"])
+    return user
+
+
+@pytest.mark.django_db
+def test_edit_form_reads_typed_time_in_users_timezone(
+    authenticated_client, kampala_user, trading_account
+):
+    """22:30 in Kampala is 19:30 UTC. Read as UTC it would land on the next
+    Kampala day, and FAIR would show one day more than the firm gives."""
+    response = authenticated_client.post(
+        _edit_url(trading_account.pk),
+        {
+            "account_name": trading_account.account_name,
+            "broker": "Broker",
+            "last_trade_date": "2025-11-19T22:30",
+        },
+    )
+    assert response.status_code == 302
+    trading_account.refresh_from_db()
+    assert trading_account.last_trade_date == datetime(2025, 11, 19, 19, 30, tzinfo=UTC)
+
+
+@pytest.mark.django_db
+def test_account_page_shows_times_in_users_timezone(
+    authenticated_client, kampala_user, trading_account
+):
+    trading_account.last_trade_date = datetime(2025, 11, 19, 14, 30, tzinfo=UTC)
+    trading_account.save(update_fields=["last_trade_date"])
+    html = authenticated_client.get(_detail_url(trading_account.pk)).content.decode()
+    assert "Nov 19, 2025 17:30" in html
+    assert "Nov 19, 2025 14:30" not in html
+    # Switched back afterwards, so it can't leak into the next request
+    # handled on the same thread.
+    assert timezone.get_current_timezone_name() == settings.TIME_ZONE
+
+
+@pytest.mark.django_db
+def test_edit_form_says_which_timezone_to_type_in(
+    authenticated_client, kampala_user, trading_account
+):
+    html = authenticated_client.get(_edit_url(trading_account.pk)).content.decode()
+    assert "In your time zone: Africa/Kampala" in html

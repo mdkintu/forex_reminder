@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tz %}
 
 {% block title %}{% if form.instance.pk %}Edit{% else %}Add{% endif %} Trading Account — FAIR{% endblock %}
 
@@ -55,7 +56,8 @@
                 <div class="mb-3">
                     <label class="form-label" for="{{ form.last_trade_date.id_for_label }}">Last trade date</label>
                     {{ form.last_trade_date }}
-                    <div class="form-text">{{ form.last_trade_date.help_text }}</div>
+                    {% get_current_timezone as TIME_ZONE %}
+                    <div class="form-text">{{ form.last_trade_date.help_text }} In your time zone: {{ TIME_ZONE }}.</div>
                     {% for error in form.last_trade_date.errors %}
                         <div class="text-danger small">{{ error }}</div>
                     {% endfor %}
