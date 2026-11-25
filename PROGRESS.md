@@ -1,11 +1,12 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-24 | **Git SHA:** `5481f94` (on the server since 2026-11-24)
+**Last updated:** 2026-11-26 | **Git SHA:** `826f1e1` (server still at `5481f94`: the timezone fix is pushed to `main` but not yet pulled on the server)
 
 ---
 
-## Next steps (end of 2026-11-24)
+## Next steps (updated 2026-11-26)
 
+0. **Deploy the timezone fix (`826f1e1`):** `git pull`, `migrate` (nothing to apply) and restart (see "Website shows the user's own timezone"). Then the GFT account page should show its last trade as Nov 19, 2026 17:30.
 1. **Sync the other four accounts:** "$50k Phase 2" (#5), "$5k Live Account" (#7) and the two "$5k Phase 1" (#6, #8). For each, find the firm (ask the owner, or look it up through the FundedNext connector) and the computer it's traded from. Set its *Account number* on FAIR to its MT5 login, then:
    - **FundedNext CFD, $50k and up:** send the question below and keep using "I traded" until FundedNext says yes in writing.
    - **FundedNext under $50k, or The5ers:** a separate MT5 with the investor password, or the trading MT5 if an EA the firm allows already trades there (FAIR Sync on a chart with no other EA).
@@ -139,6 +140,14 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - **Monitor (set up 2026-11-24):** a server cron (`*/5 * * * *`) loads it (30 s timeout, 2 retries) and pings the healthchecks.io check "FAIR website" (Simple: 5 min period, 10 min grace) with curl's exit status (`https://hc-ping.com/<uuid>/$?`), so alerts come from @HealthchecksBot like the reminder check's. Catches pending migrations, a database that's down, an app that can't start, web server or SSL problems, answers slower than 30 s, and the server going silent. Blind spots: bugs limited to one page, and problems only outside visitors hit (DNS, domain expiry).
 - **Deploy:** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate && touch tmp/restart.txt` (no new migration), then `curl -s https://fair.tergym.com/health/` should print `ok`.
 
+### Website shows the user's own timezone (2026-11-26, `826f1e1`; not yet deployed)
+- **Problem:** trades are stored in UTC, and the reminders, Telegram bot, calendar feed and MT5 sync all handle timezones explicitly. But web requests ran in the server's `TIME_ZONE` (UTC):
+  - pages showed times 3 hours behind Kampala;
+  - the account form read a typed trade time as UTC, so a trade typed for 21:00–24:00 EAT landed on the next local day, and FAIR showed one day more than the firm gives.
+- **Fix:** `UserTimezoneMiddleware` (`forex_reminder/middleware.py`, after `AuthenticationMiddleware`) runs each logged-in user's request in `User.timezone` via `timezone.override`, which switches back afterwards. Anonymous requests (Telegram webhook, MT5 sync, calendar feed, `/health/`) stay in UTC. The account form says "In your time zone: …".
+- **Existing data:** nothing stored changes. Times typed on the website before the fix were saved as UTC, so after the deploy they show 3 hours later than what was typed, until the next trade replaces them or they're corrected with Edit.
+- **Deploy:** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate && touch tmp/restart.txt` (no new migration).
+
 ### Deploy everything at once (phases 1–5)
 In `/home/tergfern/fair`, with `python` meaning `/home/tergfern/virtualenv/fair/3.12/bin/python` (see "Server python" above): `git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, optionally add `HEALTHCHECK_PING_URL` to `.env`, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
 
@@ -266,7 +275,7 @@ send_reminders command then: maybe_send_daily_report(), ping_healthcheck()
 - Legal pages (terms, privacy, contact)
 - Production security (HTTPS, cookies, HSTS, headers)
 - Admin interface
-- Test suite (253 passing, incl. MT5 auto-sync and `/health/`)
+- Test suite (256 passing, incl. MT5 auto-sync, `/health/` and the user's timezone on web pages)
 - Roadmap phases 1–5 (monitoring, one-tap traded, per-account limits, reliable delivery, UX)
 
 ### Known Limitations (Not Next Features, Just Context)
@@ -360,7 +369,7 @@ All done on the live server. For a new one, run `manage.py` with that app's own 
 
 ## Architecture Notes
 
-- **Timezone correctness:** All inactivity counting done in user's local TZ (not UTC). This is crucial for global users.
+- **Timezone correctness:** All inactivity counting done in user's local TZ (not UTC). Times are stored in UTC; web pages and forms show and read them in the user's TZ (`UserTimezoneMiddleware`). This is crucial for global users.
 - **Deduplication:** Unique constraint + IntegrityError catch prevents double-sends even with concurrent cron workers. Scoped per cycle (`cycle_start`) so reminders restart after each new trade.
 - **Grace window:** Late cron runs (up to 3 hours) still deliver reminders, avoiding missed notifications.
 - **Later-in-day skip rule:** If user trades after the 9 AM slot, the 2 PM slot is skipped same day.
