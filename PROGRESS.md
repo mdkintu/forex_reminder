@@ -1,12 +1,11 @@
 # FAIR (Forex Account Inactivity Reminder) — System State Summary
 
-**Last updated:** 2026-11-26 | **Git SHA:** `826f1e1` (server still at `5481f94`: the timezone fix is pushed to `main` but not yet pulled on the server)
+**Last updated:** 2026-11-26 | **Git SHA:** `826f1e1` (on the server since 2026-11-26)
 
 ---
 
 ## Next steps (updated 2026-11-26)
 
-0. **Deploy the timezone fix (`826f1e1`):** `git pull`, `migrate` (nothing to apply) and restart (see "Website shows the user's own timezone"). Then the GFT account page should show its last trade as Nov 19, 2026 17:30.
 1. **Sync the other four accounts:** "$50k Phase 2" (#5), "$5k Live Account" (#7) and the two "$5k Phase 1" (#6, #8). For each, find the firm (ask the owner, or look it up through the FundedNext connector) and the computer it's traded from. Set its *Account number* on FAIR to its MT5 login, then:
    - **FundedNext CFD, $50k and up:** send the question below and keep using "I traded" until FundedNext says yes in writing.
    - **FundedNext under $50k, or The5ers:** a separate MT5 with the investor password, or the trading MT5 if an EA the firm allows already trades there (FAIR Sync on a chart with no other EA).
@@ -133,20 +132,23 @@ Five phases: 1 health monitoring, 2 one-tap "I traded" (email link + Telegram bu
 - **Verified:** 249 tests pass; curl against a scratch-DB dev server: newer open → updated, older open/heartbeat → unchanged, wrong login → 404, bad key → 401. **Live demo run (2026-11-23):** MT5 build 6230 under Wine 11 on Linux, Dukascopy demo account, local FAIR at `http://127.0.0.1:8000`. The EA compiles in MetaEditor (0 errors, 0 warnings); three manual trades each reached FAIR within ~2 s and restarted the countdown; server time → UTC came out right (Dukascopy's server is GMT+2).
 - **Setup gotchas (from that run):** add the FAIR URL in MT5's Tools › Options › Expert Advisors dialog. Editing `WebRequestUrl` in `Config/common.ini` only ticks the box and leaves the list empty. An unlisted IP-address URL fails with 4006, not 4014; the EA gives the allow-list hint for both. A command-line compile doesn't reload an EA already on a chart, so re-attach it. Under Wine, compile with a path relative to the MT5 folder: `wine MetaEditor64.exe '/compile:MQL5\Experts\FAIR_Sync.mq5' /log`.
 - **Deploy (done 2026-11-23):** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate` (accounts 0008, trades 0010) `&& touch tmp/restart.txt`. Then on Windows (or Linux with Wine): profile → Download FAIR Sync EA → MetaEditor F7 → attach to a **demo** account first, open a trade, check FAIR's last trade time; then switch to the investor login on the real account. Set each account's *Account number* on FAIR to its MT5 login.
-- **In use since 2026-11-24:** the GFT "$10K Phase 2" account (login 315004527, GoatFunded-Server) syncs from the owner's GFT trading terminal on their own computer (MT5 under Wine). FAIR Sync sits on its own chart there, next to the owner's own trading EA. A separate investor-password terminal isn't needed for this account: it's already traded by a self-written EA, which GFT allows. The first sync moved the last trade forward to 2026-11-19 14:30 UTC (25 days left). Accounts at firms that ban EAs still need the separate investor terminal. The profile card and the EA header now describe both options: a chart with no other EA, its own "Allow Algo Trading" unticked, and the terminal's Algo Trading left on for the bot.
+- **In use since 2026-11-24:** the GFT "$10K Phase 2" account (login 315004527, GoatFunded-Server) syncs from the owner's GFT trading terminal on their own computer (MT5 under Wine). FAIR Sync sits on its own chart there, next to the owner's own trading EA. A separate investor-password terminal isn't needed for this account: it's already traded by a self-written EA, which GFT allows. The first sync moved the last trade forward to 2026-11-19 14:30 UTC (25 days left). Accounts at firms that ban EAs still need the separate investor terminal. The profile card and the EA header now describe both options: a chart with no other EA, its own "Allow Algo Trading" unticked, and the terminal's Algo Trading left on for the bot. On 2026-11-25, two trades (opened 12:45 and 14:00 UTC) each reached FAIR within seconds and reset the countdown to 30 days. A one-off `FAIR: server answered 1001` that morning (08:47 EAT) cleared by itself: MT5 returned 1001 instead of an HTTP status, meaning FAIR's answer never arrived.
 
 ### Website health check (`ea3c122`, deployed 2026-11-24)
 - **`/health/`** (`forex_reminder/health.py`): `ok` (200) when the database answers and every migration is applied; `N unapplied migration(s)` (503) when the code is ahead of the database, as in the 2026-11-23 incident (the home page didn't show that one: it doesn't touch the database); 500 if the database is unreachable. Never cached.
 - **Monitor (set up 2026-11-24):** a server cron (`*/5 * * * *`) loads it (30 s timeout, 2 retries) and pings the healthchecks.io check "FAIR website" (Simple: 5 min period, 10 min grace) with curl's exit status (`https://hc-ping.com/<uuid>/$?`), so alerts come from @HealthchecksBot like the reminder check's. Catches pending migrations, a database that's down, an app that can't start, web server or SSL problems, answers slower than 30 s, and the server going silent. Blind spots: bugs limited to one page, and problems only outside visitors hit (DNS, domain expiry).
 - **Deploy:** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate && touch tmp/restart.txt` (no new migration), then `curl -s https://fair.tergym.com/health/` should print `ok`.
 
-### Website shows the user's own timezone (2026-11-26, `826f1e1`; not yet deployed)
+### Website shows the user's own timezone (`826f1e1`, deployed 2026-11-26)
 - **Problem:** trades are stored in UTC, and the reminders, Telegram bot, calendar feed and MT5 sync all handle timezones explicitly. But web requests ran in the server's `TIME_ZONE` (UTC):
   - pages showed times 3 hours behind Kampala;
   - the account form read a typed trade time as UTC, so a trade typed for 21:00–24:00 EAT landed on the next local day, and FAIR showed one day more than the firm gives.
 - **Fix:** `UserTimezoneMiddleware` (`forex_reminder/middleware.py`, after `AuthenticationMiddleware`) runs each logged-in user's request in `User.timezone` via `timezone.override`, which switches back afterwards. Anonymous requests (Telegram webhook, MT5 sync, calendar feed, `/health/`) stay in UTC. The account form says "In your time zone: …".
 - **Existing data:** nothing stored changes. Times typed on the website before the fix were saved as UTC, so after the deploy they show 3 hours later than what was typed, until the next trade replaces them or they're corrected with Edit.
-- **Deploy:** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate && touch tmp/restart.txt` (no new migration).
+- **Deploy (done 2026-11-26):** `cd /home/tergfern/fair && git pull && /home/tergfern/virtualenv/fair/3.12/bin/python manage.py migrate && touch tmp/restart.txt` (no new migration). Checked live:
+  - the GFT account page shows its last trade in Kampala time: Nov 25, 2026 17:00, stored as 14:00 UTC;
+  - the edit form says "In your time zone: Africa/Kampala";
+  - `/health/`, the home and login pages, and the sync endpoint (401 for a fake key) all answer as before.
 
 ### Deploy everything at once (phases 1–5)
 In `/home/tergfern/fair`, with `python` meaning `/home/tergfern/virtualenv/fair/3.12/bin/python` (see "Server python" above): `git pull && python manage.py migrate && touch tmp/restart.txt`, then: `python manage.py set_telegram_webhook`, `python manage.py set_reminder_days 20 15 10 5 3 2 1 0`, optionally add `HEALTHCHECK_PING_URL` to `.env`, restart, then `python manage.py send_reminders --dry-run` and "Send me a test reminder" on the profile page.
